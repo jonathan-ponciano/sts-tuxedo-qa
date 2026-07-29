@@ -294,6 +294,7 @@ footer a { color: var(--ink); text-decoration: underline; }
     <div class="links">
       <a href="#como-funciona">Como funciona</a>
       <a href="#ferramentas">Ferramentas</a>
+      <a href="#tutorial">Tutorial</a>
       <a href="#arquitetura">Arquitetura</a>
       <a href="#quickstart">Quickstart</a>
       <a href="https://github.com/jonathan-ponciano/sts-tuxedo-qa" target="_blank" rel="noopener">GitHub</a>
@@ -304,8 +305,8 @@ footer a { color: var(--ink); text-decoration: underline; }
 <header class="hero" id="top">
   <div class="wrap">
     <div class="eyebrow">MCP server · Playwright · self-hosted</div>
-    <h1 class="headline serif">Dê ao seu assistente de IA as mãos pra escrever, rodar e corrigir os próprios testes E2E.</h1>
-    <p class="subhead">tuxedo-qa é um servidor MCP + dashboard local que conecta na conversa que você já está tendo com a IA — sem pipeline de CI, sem infraestrutura compartilhada, sem segredo de teste vazando pra lugar nenhum.</p>
+    <h1 class="headline serif">Dê ao seu assistente de IA os olhos pra rodar um fluxo de verdade e te dizer o que realmente saiu na rede.</h1>
+    <p class="subhead">tuxedo-qa é um servidor MCP + dashboard local que roda um macro num browser real — sozinho ou com você no volante via pair-debug — e devolve o payload de request/response de cada chamada. Vira teste agendado só quando você quer que isso rode de novo depois.</p>
     <div class="cta-row">
       <a class="btn primary" href="#quickstart">Rodar agora →</a>
       <a class="btn ghost" href="https://github.com/jonathan-ponciano/sts-tuxedo-qa" target="_blank" rel="noopener">Ver código no GitHub</a>
@@ -329,7 +330,7 @@ footer a { color: var(--ink); text-decoration: underline; }
         <p>Controle total, mas alguém precisa configurar runner, scheduler, storage de resultado, alerta — e ficar reescrevendo specs Playwright cada vez que a UI muda.</p>
       </div>
     </div>
-    <p class="insight serif">Você já está numa conversa com a IA descrevendo o que quer testar. Se ela puder <em>escrever o Playwright, rodar, ler a falha e corrigir sozinha</em> — e um humano só entra pra aprovar credencial e 2FA — o custo de manter uma suíte sintética cai pra perto de zero.</p>
+    <p class="insight serif">Você já está numa conversa com a IA descrevendo o fluxo que quer verificar. Se ela puder <em>rodar isso num browser de verdade e ler o payload que saiu pra rede</em> — o BFF recebeu o campo certo? o evento de analytics disparou com o identificador certo? — sem precisar escrever e manter um arquivo de teste pra cada checagem pontual, boa parte da verificação de fluxo vira uma pergunta que a IA responde direto na conversa.</p>
   </div>
 </section>
 
@@ -337,17 +338,22 @@ footer a { color: var(--ink); text-decoration: underline; }
   <div class="wrap">
     <div class="section-head">
       <div class="eyebrow">Como funciona</div>
-      <h2 class="section-title serif">Da descrição ao teste agendado, numa conversa</h2>
-      <p>O assistente de IA chama ferramentas MCP ao longo da conversa; o humano só entra pra aprovar credencial, 2FA, e ver o resultado no dashboard.</p>
+      <h2 class="section-title serif">Dois jeitos de rodar o fluxo, uma mesma conversa</h2>
+      <p>O assistente de IA chama ferramentas MCP ao longo da conversa; o humano só entra pra aprovar credencial, 2FA, e dirigir quando o modo pede um piloto.</p>
     </div>
     <div class="flow">
-      <span class="step">descreve o fluxo</span><span class="arrow">→</span>
-      <span class="step">inspect_page</span><span class="arrow">→</span>
-      <span class="step">create_test</span><span class="arrow">→</span>
-      <span class="step">run_tests</span><span class="arrow">→</span>
-      <span class="step">validated = true</span><span class="arrow">→</span>
-      <span class="step">agendado</span>
+      <span class="step">sozinho: descreve o fluxo</span><span class="arrow">→</span>
+      <span class="step">inspect_page(url, actions)</span><span class="arrow">→</span>
+      <span class="step">network[] com request/response body</span><span class="arrow">→</span>
+      <span class="step">IA lê o payload</span>
     </div>
+    <div class="flow">
+      <span class="step">copiloto: start_pair_debug</span><span class="arrow">→</span>
+      <span class="step">humano dirige via noVNC</span><span class="arrow">→</span>
+      <span class="step">IA observa console/rede ao vivo</span><span class="arrow">→</span>
+      <span class="step">stop_pair_debug</span>
+    </div>
+    <p style="text-align:center; color: var(--muted); font-size: 0.9rem; max-width: 640px; margin: -1.5rem auto 3rem;">Quer que esse fluxo rode de novo sozinho, num cron? Aí sim vale <code>create_test</code> — a IA já tem os seletores certos de quando inspecionou a página.</p>
     <div class="diagram">
       <div class="box">
         <div class="tag">cliente MCP</div>
@@ -386,19 +392,20 @@ footer a { color: var(--ink); text-decoration: underline; }
   <div class="wrap">
     <div class="section-head">
       <div class="eyebrow">18 ferramentas MCP</div>
-      <h2 class="section-title serif">Todo o ciclo de vida de um teste sintético</h2>
-      <p>Agrupadas por intenção — descoberta e criação, gestão de testes, credenciais e notificação.</p>
+      <h2 class="section-title serif">Macro em primeiro lugar, teste agendado quando você pedir</h2>
+      <p>Agrupadas por intenção — macro &amp; descoberta, gestão de testes, credenciais e notificação.</p>
     </div>
     <div class="cards">
       <div class="card">
-        <h3>Descoberta &amp; criação</h3>
+        <h3>Macro &amp; descoberta</h3>
         <ul class="tool-list">
           <li><code>inspect_page</code><span class="status-tag live">ativa</span></li>
-          <li><code>create_test</code><span class="status-tag live">ativa</span></li>
           <li><code>start_pair_debug</code><span class="status-tag live">ativa</span></li>
           <li><code>get_pair_debug_context</code><span class="status-tag live">ativa</span></li>
           <li><code>stop_pair_debug</code><span class="status-tag live">ativa</span></li>
+          <li><code>create_test</code><span class="status-tag live">ativa</span></li>
         </ul>
+        <p style="margin-top:0.9rem; color: var(--muted); font-size: 0.82rem;"><code>network[]</code> traz <code>requestBody</code>/<code>responseBody</code> pra chamadas xhr/fetch (truncado em 5000 chars) — dá pra confirmar o payload de verdade, não só que a chamada aconteceu.</p>
       </div>
       <div class="card">
         <h3>Gestão de testes</h3>
@@ -472,6 +479,50 @@ footer a { color: var(--ink); text-decoration: underline; }
       <span class="badge">Docker</span>
       <span class="badge">MCP SDK</span>
       <span class="badge">noVNC</span>
+    </div>
+  </div>
+</section>
+
+<section id="tutorial">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Tutorial</div>
+      <h2 class="section-title serif">Exemplo: confirmar que um evento de analytics disparou certo</h2>
+      <p>O caso de uso mais comum não é "escreve um teste" — é "roda esse fluxo e me diz o que saiu na rede". Sem nenhum arquivo de teste criado.</p>
+    </div>
+    <div class="steps">
+      <h3>1. A IA chama <code>inspect_page</code> com a URL e os passos do fluxo</h3>
+      <div class="terminal">
+<span class="c">// input de inspect_page</span>
+{
+  "url": "https://meuapp.com/checkout",
+  "actions": [
+    { "type": "click", "selector": "[data-testid='plan-pro']" },
+    { "type": "fill", "selector": "#email", "value": "qa@meuapp.com" },
+    { "type": "click", "selector": "button[type=submit]" }
+  ]
+}
+      </div>
+
+      <h3>2. A resposta traz os elementos da tela e a lista de chamadas de rede</h3>
+      <p>Cada entrada xhr/fetch já vem com o corpo da request e da response — não só método, status e URL.</p>
+      <div class="terminal">
+<span class="c">// trecho de network[] na resposta</span>
+{
+  "method": "POST",
+  "url": "https://api.meuapp.com/analytics/track",
+  "status": 200,
+  "resourceType": "fetch",
+  "requestBody": "{\"event\":\"plan_selected\",\"plan\":\"pro\",\"user\":\"qa@meuapp.com\"}",
+  "responseBody": "{\"ok\":true}"
+}
+      </div>
+
+      <h3>3. A IA lê o payload e responde direto na conversa</h3>
+      <p>"O evento <code>plan_selected</code> disparou com <code>plan: pro</code> — bateu com o esperado." Nada foi persistido; se você quiser que essa checagem rode de novo toda noite, é aí que entra o <code>create_test</code> — usando os mesmos seletores que o <code>inspect_page</code> já validou.</p>
+
+      <h3>Prefere ver ao vivo em vez de descrever o fluxo? Use pair-debug</h3>
+      <p>Chame <code>start_pair_debug</code>, abra o <code>vncWsPath</code> retornado no dashboard e dirija o browser você mesmo — login com 2FA, fluxo que depende de estado difícil de descrever, etc. A IA recebe console e rede em tempo real via <code>get_pair_debug_context</code> e comenta junto. <code>stop_pair_debug</code> fecha a sessão e ainda devolve um rascunho de teste a partir do que você clicou, caso valha a pena persistir.</p>
     </div>
   </div>
 </section>
