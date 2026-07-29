@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ToolInput, ToolOutput } from "@tuxedo-qa/shared";
 import type { ProjectContext } from "../db/project-context.ts";
 import { encryptSecret } from "../crypto/index.ts";
+import { getEnabledProtectionHeaders } from "../protection/headers.ts";
 import { runnerClient } from "../runner-client/index.ts";
 import { computeNextDueAt } from "../runs/schedule.ts";
 import { awaitRunTerminal, triggerRun } from "../runs/trigger-run.ts";
@@ -33,11 +34,14 @@ const TEST_JOIN = `
 `;
 
 export async function inspectPage(ctx: ProjectContext, input: ToolInput<"inspect_page">): Promise<ToolOutput<"inspect_page">> {
+  // Stored protection headers apply automatically (that's the point of storing them
+  // centrally); explicit `input.headers` from the AI take precedence on key clashes.
+  const stored = getEnabledProtectionHeaders(ctx);
   return runnerClient.inspectPage({
     projectSlug: ctx.slug,
     url: input.url,
     actions: input.actions,
-    headers: input.headers,
+    headers: { ...stored, ...input.headers },
   });
 }
 
@@ -47,7 +51,12 @@ export async function createTest(ctx: ProjectContext, input: ToolInput<"create_t
 
   let dryRun: ToolOutput<"create_test">["dryRun"];
   try {
-    const result = await runnerClient.dryRunTest({ projectSlug: ctx.slug, specSource: input.script });
+    const protectionHeaders = getEnabledProtectionHeaders(ctx);
+    const result = await runnerClient.dryRunTest({
+      projectSlug: ctx.slug,
+      specSource: input.script,
+      protectionHeaders: Object.keys(protectionHeaders).length > 0 ? protectionHeaders : undefined,
+    });
     dryRun = { ok: result.valid && result.executedOk, errors: result.errors };
   } catch (err) {
     dryRun = { ok: false, errors: [`runner unreachable: ${(err as Error).message}`] };
@@ -278,7 +287,12 @@ function readPairDebugSession(ctx: ProjectContext, sessionId: number): PairDebug
 }
 
 export async function startPairDebug(ctx: ProjectContext, input: ToolInput<"start_pair_debug">): Promise<ToolOutput<"start_pair_debug">> {
-  const { sessionId: runnerSessionId, vncWsPath } = await runnerClient.startPairDebug({ projectSlug: ctx.slug, url: input.url });
+  const protectionHeaders = getEnabledProtectionHeaders(ctx);
+  const { sessionId: runnerSessionId, vncWsPath } = await runnerClient.startPairDebug({
+    projectSlug: ctx.slug,
+    url: input.url,
+    protectionHeaders: Object.keys(protectionHeaders).length > 0 ? protectionHeaders : undefined,
+  });
   const { lastInsertRowid } = ctx.db.run(
     "INSERT INTO pair_debug_sessions (status, runner_session_id) VALUES ('active', ?1)",
     [runnerSessionId],

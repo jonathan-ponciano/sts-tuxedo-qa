@@ -29,12 +29,18 @@ function record(session: Session, type: PairDebugEvent["type"], payload: Record<
   for (const listener of session.listeners) listener(event);
 }
 
-export async function startSession(url?: string): Promise<{ sessionId: string; vncWsPath: string }> {
+export async function startSession(
+  url?: string,
+  protectionHeaders?: Record<string, string>,
+): Promise<{ sessionId: string; vncWsPath: string }> {
   if (hasActiveSession()) throw new Error("a pair-debug session is already active");
 
   // headless: false relies on DISPLAY (set to :99 by entrypoint.sh) pointing at the container's Xvfb.
   const browser = await chromium.launch({ headless: false, args: ["--start-maximized"] });
   const page: Page = await browser.newPage();
+  if (protectionHeaders && Object.keys(protectionHeaders).length > 0) {
+    await page.setExtraHTTPHeaders(protectionHeaders);
+  }
   const id = randomUUID();
   const session: Session = { id, browser, events: [], seq: 0, listeners: new Set() };
   sessions.set(id, session);

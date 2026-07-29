@@ -17,6 +17,7 @@ export interface InspectPageResponse {
 export interface DryRunRequest {
   projectSlug: string;
   specSource: string;
+  protectionHeaders?: Record<string, string>;
 }
 export interface DryRunResponse {
   valid: boolean;
@@ -50,6 +51,7 @@ export interface RunAcceptedResponse {
 export interface PairDebugStartRequest {
   projectSlug: string;
   url?: string;
+  protectionHeaders?: Record<string, string>;
 }
 export interface PairDebugStartResponse {
   sessionId: string;

@@ -1,5 +1,6 @@
 import type { RunStatus, RunTrigger } from "@tuxedo-qa/shared";
 import type { ProjectContext } from "../db/project-context.ts";
+import { getEnabledProtectionHeaders } from "../protection/headers.ts";
 import { runnerClient } from "../runner-client/index.ts";
 import { bridgeRunnerEvents } from "../streaming/hub.ts";
 
@@ -62,7 +63,13 @@ export async function triggerRun(ctx: ProjectContext, opts: TriggerRunOptions): 
       if (!row) throw new Error(`test ${testId} not found`);
       return { testId, fileName: row.file_path };
     });
-    await runnerClient.startRun({ projectSlug: ctx.slug, runId, targets });
+    const protectionHeaders = getEnabledProtectionHeaders(ctx);
+    await runnerClient.startRun({
+      projectSlug: ctx.slug,
+      runId,
+      targets,
+      protectionHeaders: Object.keys(protectionHeaders).length > 0 ? protectionHeaders : undefined,
+    });
     ctx.db.run("UPDATE test_runs SET status = 'running' WHERE id = ?1", [runId]);
     if (singleTestId !== undefined) {
       ctx.db.run("UPDATE tests SET last_run_status = 'running' WHERE id = ?1", [singleTestId]);

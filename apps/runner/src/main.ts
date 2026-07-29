@@ -37,7 +37,11 @@ app.post("/internal/inspect-page", async (c) => {
   }
 });
 
-const dryRunSchema = z.object({ projectSlug: z.string(), specSource: z.string() });
+const dryRunSchema = z.object({
+  projectSlug: z.string(),
+  specSource: z.string(),
+  protectionHeaders: z.record(z.string(), z.string()).optional(),
+});
 
 app.post("/internal/tests/dry-run", async (c) => {
   const parsed = dryRunSchema.safeParse(await c.req.json());
@@ -84,13 +88,17 @@ app.get("/internal/runs/:runId/events", (c) => {
 // Pair-debug (noVNC). Relies on entrypoint.sh having started Xvfb/x11vnc/websockify
 // on :99 — unverified on this host (no X11 libs here by design, see task 9 notes),
 // exercised for real once the runner image builds and boots in Docker.
-const pairDebugStartSchema = z.object({ projectSlug: z.string(), url: z.string().url().optional() });
+const pairDebugStartSchema = z.object({
+  projectSlug: z.string(),
+  url: z.string().url().optional(),
+  protectionHeaders: z.record(z.string(), z.string()).optional(),
+});
 
 app.post("/internal/pair-debug/sessions", async (c) => {
   const parsed = pairDebugStartSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
   try {
-    const result = await startSession(parsed.data.url);
+    const result = await startSession(parsed.data.url, parsed.data.protectionHeaders);
     return c.json(result);
   } catch (err) {
     return c.json({ error: "pair_debug_start_failed", message: (err as Error).message }, 409);
