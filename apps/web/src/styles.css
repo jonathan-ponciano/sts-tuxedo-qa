@@ -1,16 +1,10 @@
 :root {
-  --ink: #1b1a17;
-  --paper: #faf9f5;
-  --paper-raised: #ffffff;
-  --line: #e0ddd4;
-  --muted: #6b6558;
-  --accent: #8f7130;
-  --ok: #3f7d54;
-  --ok-bg: #e7f1e9;
-  --warn: #a2691f;
-  --warn-bg: #f3e9d6;
-  --stop: #a4433a;
-  --stop-bg: #f5e5e2;
+  --ink: #ffffff;
+  --paper: #000000;
+  --paper-raised: #000000;
+  --paper-sunken: #1a1a1a;
+  --line: #3a3a3a;
+  --muted: #999999;
 }
 
 * {
@@ -27,8 +21,8 @@ body {
 }
 
 a {
-  color: var(--accent);
-  text-decoration: none;
+  color: var(--ink);
+  text-decoration: underline;
 }
 
 .app-header {
@@ -36,13 +30,14 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem 1.5rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--ink);
   background: var(--paper-raised);
 }
 
 .app-header .brand {
   font-weight: 700;
   letter-spacing: -0.01em;
+  text-decoration: none;
 }
 
 .app-main {
@@ -71,12 +66,13 @@ h2 {
 .tabs a {
   padding: 0.6rem 0;
   color: var(--muted);
+  text-decoration: none;
   border-bottom: 2px solid transparent;
 }
 
 .tabs a.active {
   color: var(--ink);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--ink);
   font-weight: 600;
 }
 
@@ -84,8 +80,8 @@ table {
   width: 100%;
   border-collapse: collapse;
   background: var(--paper-raised);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -101,8 +97,9 @@ thead th {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
-  background: #f6f3ec;
+  color: var(--ink);
+  background: var(--paper-sunken);
+  border-bottom: 1px solid var(--ink);
 }
 
 tbody tr:last-child td {
@@ -110,37 +107,43 @@ tbody tr:last-child td {
 }
 
 tbody tr:hover {
-  background: #f6f4ee;
+  background: var(--paper-sunken);
   cursor: pointer;
 }
 
+/* Status is communicated by fill weight and border style, not color —
+   the label text itself carries the meaning (passou/falhou/rodando). */
 .pill {
   display: inline-flex;
   align-items: center;
   padding: 0.15em 0.6em;
-  border-radius: 999px;
+  border-radius: 3px;
   font-size: 0.75rem;
   font-weight: 600;
+  border: 1px solid var(--ink);
 }
 
 .pill.ok {
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-
-.pill.warn {
-  background: var(--warn-bg);
-  color: var(--warn);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .pill.stop {
-  background: var(--stop-bg);
-  color: var(--stop);
+  background: var(--paper);
+  color: var(--ink);
+  border-width: 2px;
+}
+
+.pill.warn {
+  background: var(--paper);
+  color: var(--ink);
+  border-style: dashed;
 }
 
 .pill.muted {
-  background: #eee;
+  background: var(--paper-sunken);
   color: var(--muted);
+  border-color: var(--line);
 }
 
 button,
@@ -150,35 +153,50 @@ select {
 }
 
 button {
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink);
   background: var(--paper-raised);
-  border-radius: 6px;
+  color: var(--ink);
+  border-radius: 4px;
   padding: 0.45rem 0.9rem;
   cursor: pointer;
 }
 
+button:hover:not(:disabled) {
+  background: var(--paper-sunken);
+}
+
 button.primary {
   background: var(--ink);
-  color: white;
+  color: var(--paper);
   border-color: var(--ink);
 }
 
+button.primary:hover:not(:disabled) {
+  background: #dddddd;
+}
+
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 input[type="text"],
 input[type="password"] {
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
   padding: 0.4rem 0.6rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+input::placeholder {
+  color: var(--muted);
 }
 
 .card {
   background: var(--paper-raised);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
   padding: 1.1rem 1.3rem;
   margin-bottom: 1rem;
 }
@@ -201,10 +219,11 @@ input[type="password"] {
 }
 
 pre.log {
-  background: #14130f;
-  color: #d8d3c4;
+  background: var(--paper-sunken);
+  color: var(--ink);
   padding: 0.9rem 1rem;
-  border-radius: 8px;
+  border-radius: 0;
+  border: 1px solid var(--ink);
   max-height: 320px;
   overflow: auto;
   font-size: 0.8rem;
@@ -214,9 +233,9 @@ pre.log {
 code.script {
   display: block;
   white-space: pre-wrap;
-  background: #f6f3ec;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--ink);
+  border-radius: 0;
   padding: 0.9rem 1rem;
   font-size: 0.82rem;
   max-height: 320px;

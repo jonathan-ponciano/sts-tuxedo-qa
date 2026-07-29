@@ -16,7 +16,10 @@ app.route("/api", apiRoute);
 // Registered last so /mcp and /api above always win for their own paths.
 if (existsSync(webDistDir)) {
   app.use("/*", serveStatic({ root: webDistDir }));
-  app.get("*", serveStatic({ path: `${webDistDir}/index.html` }));
+  // NB: `path` alone joins against the default root "./" (path.join strips a
+  // leading slash from an absolute second segment), so this must go through
+  // `root` too rather than pass a precomputed absolute path via `path`.
+  app.get("*", serveStatic({ root: webDistDir, path: "index.html" }));
 }
 
 Bun.serve({ port: config.port, fetch: app.fetch });

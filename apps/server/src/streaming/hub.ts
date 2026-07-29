@@ -7,25 +7,58 @@ import { runnerClient } from "../runner-client/index.ts";
 
 type Listener = (event: RunProgressEvent) => void;
 
+interface RunBuffer {
+  events: RunProgressEvent[];
+  done: boolean;
+}
+
 const subscribers = new Map<number, Set<Listener>>();
+/**
+ * Buffered events per run, so a dashboard tab that opens its SSE connection
+ * AFTER a fast run has already finished (common — a 2-3s run can complete
+ * before the browser's EventSource handshake lands) still sees the full
+ * timeline via replay, instead of hanging on "waiting for events" forever.
+ */
+const buffers = new Map<number, RunBuffer>();
 /** Active-run registry for the Monitor page — in-memory only, per plan section B. */
 const activeRunsBySlug = new Map<string, Set<number>>();
 
-export function subscribeToRunEvents(runId: number, listener: Listener): () => void {
+function getOrCreateBuffer(runId: number): RunBuffer {
+  let buf = buffers.get(runId);
+  if (!buf) {
+    buf = { events: [], done: false };
+    buffers.set(runId, buf);
+  }
+  return buf;
+}
+
+export function subscribeToRunEvents(runId: number, listener: Listener) {
+  const buf = getOrCreateBuffer(runId);
   let set = subscribers.get(runId);
   if (!set) {
     set = new Set();
     subscribers.set(runId, set);
   }
   set.add(listener);
-  return () => {
-    set?.delete(listener);
-    if (set?.size === 0) subscribers.delete(runId);
+  return {
+    replay: [...buf.events],
+    isDone: () => buf.done,
+    unsubscribe: () => {
+      set?.delete(listener);
+      if (set?.size === 0) subscribers.delete(runId);
+    },
   };
 }
 
 function broadcast(runId: number, event: RunProgressEvent): void {
+  const buf = getOrCreateBuffer(runId);
+  buf.events.push(event);
+  if (event.kind === "status") buf.done = true;
   for (const listener of subscribers.get(runId) ?? []) listener(event);
+}
+
+function scheduleBufferCleanup(runId: number, delayMs = 5 * 60_000): void {
+  setTimeout(() => buffers.delete(runId), delayMs);
 }
 
 export function getActiveRunCount(slug: string): number {
@@ -109,6 +142,7 @@ export async function bridgeRunnerEvents(ctx: ProjectContext, runId: number): Pr
         if (event.kind === "status" && isTerminalStatus(event.status)) {
           applyTerminalStatus(ctx, runId, event.status);
           markInactive(ctx.slug, runId);
+          scheduleBufferCleanup(runId);
         }
       }
     }

@@ -11,7 +11,13 @@ export function useRunStream(slug: string, runId: number | null): RunProgressEve
     const source = new EventSource(`/api/projects/${slug}/runs/${runId}/stream`);
     source.onmessage = (msg) => {
       try {
-        setEvents((prev) => [...prev, JSON.parse(msg.data) as RunProgressEvent]);
+        const event = JSON.parse(msg.data) as RunProgressEvent;
+        setEvents((prev) => [...prev, event]);
+        // The server ends the response after a terminal status — but SSE
+        // auto-reconnects by default on any closed connection, which would
+        // replay the whole buffered history again in a loop. Closing here
+        // is what actually stops that.
+        if (event.kind === "status") source.close();
       } catch {
         // ignore malformed frames (e.g. heartbeat comments)
       }

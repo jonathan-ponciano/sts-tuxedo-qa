@@ -19,24 +19,29 @@ runsRouter.post("/", async (c) => {
   return c.json(result, 202);
 });
 
-const TERMINAL = new Set(["passed", "failed", "error", "timeout"]);
-
 runsRouter.get("/:id/stream", (c) => {
   const runId = Number(c.req.param("id"));
   return streamSSE(c, async (stream) => {
-    let done = false;
-    const unsubscribe = subscribeToRunEvents(runId, (event) => {
-      void stream.writeSSE({ data: JSON.stringify(event), event: event.kind });
-      if (event.kind === "status" && TERMINAL.has(event.status)) done = true;
+    let aborted = false;
+    // No `event:` name on these frames — the payload's own `kind` field
+    // distinguishes them, and EventSource.onmessage only fires for unnamed
+    // (default "message") frames. A named `event:` would silently vanish
+    // client-side since nothing calls addEventListener for it.
+    const { replay, isDone, unsubscribe } = subscribeToRunEvents(runId, (event) => {
+      void stream.writeSSE({ data: JSON.stringify(event) });
     });
+    // Replay first: a fast run can finish before this SSE connection opens,
+    // so the terminal event may already be in the buffer, not still incoming.
+    for (const event of replay) await stream.writeSSE({ data: JSON.stringify(event) });
+
     stream.onAbort(() => {
-      done = true;
+      aborted = true;
       unsubscribe();
     });
     try {
-      while (!done) {
+      while (!isDone() && !aborted) {
         await stream.sleep(15000);
-        if (!done) await stream.writeSSE({ data: JSON.stringify({ kind: "heartbeat", runId, ts: Date.now() }) });
+        if (!isDone() && !aborted) await stream.writeSSE({ data: JSON.stringify({ kind: "heartbeat", runId, ts: Date.now() }) });
       }
     } finally {
       unsubscribe();
