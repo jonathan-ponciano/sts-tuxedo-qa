@@ -395,9 +395,9 @@ footer a { color: var(--ink); text-decoration: underline; }
         <ul class="tool-list">
           <li><code>inspect_page</code><span class="status-tag live">ativa</span></li>
           <li><code>create_test</code><span class="status-tag live">ativa</span></li>
-          <li><code>start_pair_debug</code><span class="status-tag soon">em breve</span></li>
-          <li><code>get_pair_debug_context</code><span class="status-tag soon">em breve</span></li>
-          <li><code>stop_pair_debug</code><span class="status-tag soon">em breve</span></li>
+          <li><code>start_pair_debug</code><span class="status-tag live">ativa</span></li>
+          <li><code>get_pair_debug_context</code><span class="status-tag live">ativa</span></li>
+          <li><code>stop_pair_debug</code><span class="status-tag live">ativa</span></li>
         </ul>
       </div>
       <div class="card">
@@ -408,9 +408,9 @@ footer a { color: var(--ink); text-decoration: underline; }
           <li><code>update_test</code><span class="status-tag live">ativa</span></li>
           <li><code>run_tests</code><span class="status-tag live">ativa</span></li>
           <li><code>get_status</code><span class="status-tag live">ativa</span></li>
-          <li><code>delete_test</code><span class="status-tag soon">em breve</span></li>
-          <li><code>run_until_pass</code><span class="status-tag soon">em breve</span></li>
-          <li><code>pause_tests</code><span class="status-tag soon">em breve</span></li>
+          <li><code>delete_test</code><span class="status-tag live">ativa</span></li>
+          <li><code>run_until_pass</code><span class="status-tag live">ativa</span></li>
+          <li><code>pause_tests</code><span class="status-tag live">ativa</span></li>
         </ul>
       </div>
       <div class="card">
@@ -418,9 +418,9 @@ footer a { color: var(--ink); text-decoration: underline; }
         <ul class="tool-list">
           <li><code>request_credential</code><span class="status-tag live">ativa</span></li>
           <li><code>list_credentials</code><span class="status-tag live">ativa</span></li>
-          <li><code>create_credential</code><span class="status-tag soon">em breve</span></li>
-          <li><code>delete_credential</code><span class="status-tag soon">em breve</span></li>
-          <li><code>set_webhook</code><span class="status-tag soon">em breve</span></li>
+          <li><code>create_credential</code><span class="status-tag live">ativa</span></li>
+          <li><code>delete_credential</code><span class="status-tag live">ativa</span></li>
+          <li><code>set_webhook</code><span class="status-tag live">ativa</span></li>
         </ul>
       </div>
     </div>
@@ -539,12 +539,12 @@ footer a { color: var(--ink); text-decoration: underline; }
       <p>Sem enrolação — isso é o que está rodando de verdade hoje, e o que ainda falta.</p>
     </div>
     <div class="status-list">
-      <div class="status-row"><span class="status-tag live">pronto</span><div><strong>Fatia vertical completa</strong> — inspect_page, create_test, list/read/update_test, run_tests e get_status rodam de ponta a ponta contra browser real, verificado dentro de Docker.</div></div>
+      <div class="status-row"><span class="status-tag live">pronto</span><div><strong>Todas as 18 ferramentas MCP</strong> — incluindo run_until_pass, pause_tests, webhooks e o ciclo completo de pair-debug, verificadas de ponta a ponta contra browser real dentro de Docker.</div></div>
       <div class="status-row"><span class="status-tag live">pronto</span><div><strong>Isolamento entre projetos</strong> — SQLite por projeto, testado com dois projetos simultâneos.</div></div>
-      <div class="status-row"><span class="status-tag live">pronto</span><div><strong>noVNC / pair-debug no runner</strong> — Xvfb + x11vnc + websockify testados de verdade dentro do container (o maior risco técnico do design).</div></div>
-      <div class="status-row"><span class="status-tag soon">planejado</span><div><strong>Pair-debug no dashboard</strong> — o runner já sabe fazer; falta o proxy no app e o iframe na SPA.</div></div>
-      <div class="status-row"><span class="status-tag soon">planejado</span><div><strong>run_until_pass, pause_tests, webhooks</strong> — registrados no schema das ferramentas, handler ainda não implementado.</div></div>
+      <div class="status-row"><span class="status-tag live">pronto</span><div><strong>Pair-debug com noVNC no dashboard</strong> — proxy HTTP+WebSocket no app até o websockify do runner, testado recebendo o handshake RFB real através da cadeia completa.</div></div>
+      <div class="status-row"><span class="status-tag live">pronto</span><div><strong>Webhooks de verdade</strong> — Discord, Slack ou endpoint genérico, disparados no fim de cada run e confirmados chegando no destino.</div></div>
       <div class="status-row"><span class="status-tag soon">planejado</span><div><strong>Auth no dashboard</strong> — hoje é local-first, sem login. Ponto de extensão já previsto na arquitetura.</div></div>
+      <div class="status-row"><span class="status-tag soon">planejado</span><div><strong>Testes automatizados + CI</strong> — validação até aqui foi manual (curl + browser real); ainda não existe suíte automatizada nem workflow de CI.</div></div>
     </div>
   </div>
 </section>

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -75,4 +75,15 @@ testsRouter.post("/:id/run", async (c) => {
   if (!existing) return c.json({ error: "test_not_found" }, 404);
   const result = await triggerRun(ctx, { testIds: [id], trigger: "manual" });
   return c.json(result, 202);
+});
+
+testsRouter.delete("/:id", (c) => {
+  const ctx = c.get("project");
+  const id = Number(c.req.param("id"));
+  const existing = ctx.db.query("SELECT file_path FROM tests WHERE id = ?1").get(id) as { file_path: string } | null;
+  if (!existing) return c.json({ error: "test_not_found" }, 404);
+  const specPath = join(ctx.specsDir, existing.file_path);
+  if (existsSync(specPath)) unlinkSync(specPath);
+  ctx.db.run("DELETE FROM tests WHERE id = ?1", [id]);
+  return c.json({ deleted: true });
 });

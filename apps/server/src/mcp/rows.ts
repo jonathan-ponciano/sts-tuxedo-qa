@@ -37,3 +37,12 @@ export interface CredentialRow {
   requested_at: string;
   fulfilled_at: string | null;
 }
+
+export interface PairDebugSessionRow {
+  id: number;
+  status: "starting" | "active" | "stopped";
+  started_at: string;
+  stopped_at: string | null;
+  runner_session_id: string | null;
+  draft_test_path: string | null;
+}

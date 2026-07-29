@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { credentialsRouter } from "./credentials.ts";
 import { projectMiddleware } from "./middleware.ts";
+import { pairDebugRouter } from "./pair-debug.ts";
 import { projectsRouter } from "./projects.ts";
 import { protectionHeadersRouter } from "./protection-headers.ts";
 import { runsRouter } from "./runs.ts";
@@ -21,5 +22,6 @@ projectScoped.route("/credentials", credentialsRouter);
 projectScoped.route("/protection-headers", protectionHeadersRouter);
 projectScoped.route("/webhooks", webhooksRouter);
 projectScoped.route("/status-page-config", statusPageRouter);
+projectScoped.route("/pair-debug", pairDebugRouter);
 
 apiRoute.route("/projects/:slug", projectScoped);

@@ -7,11 +7,32 @@ export interface TriggerRunOptions {
   testIds?: number[];
   trigger: RunTrigger;
   maxAttempts?: number;
+  attemptNumber?: number;
 }
 
 export interface TriggerRunResult {
   runId: number;
   status: RunStatus;
+}
+
+const TERMINAL_STATUSES: readonly RunStatus[] = ["passed", "failed", "error", "timeout"];
+
+/** Polls test_runs for a terminal status. Used by run_until_pass, which needs a synchronous outcome to decide whether to retry. */
+export async function awaitRunTerminal(
+  ctx: ProjectContext,
+  runId: number,
+  timeoutMs = 120_000,
+  pollIntervalMs = 300,
+): Promise<{ id: number; status: RunStatus }> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const row = ctx.db.query("SELECT id, status FROM test_runs WHERE id = ?1").get(runId) as
+      | { id: number; status: RunStatus }
+      | null;
+    if (row && TERMINAL_STATUSES.includes(row.status)) return row;
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  throw new Error(`run ${runId} did not reach a terminal status within ${timeoutMs}ms`);
 }
 
 /**
@@ -26,8 +47,8 @@ export async function triggerRun(ctx: ProjectContext, opts: TriggerRunOptions): 
   const singleTestId = opts.testIds?.length === 1 ? opts.testIds[0] : undefined;
 
   ctx.db.run(
-    `INSERT INTO test_runs (test_id, trigger, status, max_attempts) VALUES (?1, ?2, 'queued', ?3)`,
-    [singleTestId ?? null, opts.trigger, opts.maxAttempts ?? 1],
+    `INSERT INTO test_runs (test_id, trigger, status, max_attempts, attempt_number) VALUES (?1, ?2, 'queued', ?3, ?4)`,
+    [singleTestId ?? null, opts.trigger, opts.maxAttempts ?? 1, opts.attemptNumber ?? 1],
   );
   const { id: runId } = ctx.db.query("SELECT last_insert_rowid() as id").get() as { id: number };
 

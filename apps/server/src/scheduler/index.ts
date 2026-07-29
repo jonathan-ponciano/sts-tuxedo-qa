@@ -26,22 +26,27 @@ async function tick(): Promise<void> {
       continue;
     }
 
-    const due = ctx.db
-      .query(
-        `SELECT id, schedule FROM tests
-         WHERE validated = 1 AND schedule IS NOT NULL
-           AND (next_due_at IS NULL OR next_due_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
-      )
-      .all() as DueTestRow[];
+    const pausedUntilRow = ctx.db.query("SELECT value FROM meta WHERE key = 'paused_until'").get() as { value: string } | null;
+    const paused = pausedUntilRow ? new Date(pausedUntilRow.value).getTime() > Date.now() : false;
 
-    for (const test of due) {
-      try {
-        await triggerRun(ctx, { testIds: [test.id], trigger: "scheduled" });
-      } catch (err) {
-        console.error(`[scheduler] failed to trigger run for test ${test.id} in ${projectRow.slug}:`, (err as Error).message);
+    if (!paused) {
+      const due = ctx.db
+        .query(
+          `SELECT id, schedule FROM tests
+           WHERE validated = 1 AND schedule IS NOT NULL
+             AND (next_due_at IS NULL OR next_due_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
+        )
+        .all() as DueTestRow[];
+
+      for (const test of due) {
+        try {
+          await triggerRun(ctx, { testIds: [test.id], trigger: "scheduled" });
+        } catch (err) {
+          console.error(`[scheduler] failed to trigger run for test ${test.id} in ${projectRow.slug}:`, (err as Error).message);
+        }
+        const next = nextDueAtIso(test.schedule);
+        ctx.db.run("UPDATE tests SET next_due_at = ?1 WHERE id = ?2", [next, test.id]);
       }
-      const next = nextDueAtIso(test.schedule);
-      ctx.db.run("UPDATE tests SET next_due_at = ?1 WHERE id = ?2", [next, test.id]);
     }
 
     refreshProjectStats(ctx);

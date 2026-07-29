@@ -174,4 +174,37 @@ function applyTerminalStatus(ctx: ProjectContext, runId: number, status: Termina
   }
 
   refreshProjectStats(ctx);
+  void fireWebhooks(ctx, runId, status);
+}
+
+interface WebhookRow {
+  id: number;
+  kind: "discord" | "slack" | "generic";
+  url: string;
+  events: string;
+}
+
+function webhookBody(kind: WebhookRow["kind"], slug: string, runId: number, status: TerminalStatus): unknown {
+  const line = `tuxedo-qa: run #${runId} on "${slug}" -> ${status}`;
+  if (kind === "discord") return { content: line };
+  if (kind === "slack") return { text: line };
+  return { slug, runId, status };
+}
+
+/** Fire-and-forget: a slow or dead webhook endpoint must never block finishing a run. */
+async function fireWebhooks(ctx: ProjectContext, runId: number, status: TerminalStatus): Promise<void> {
+  const category = status === "passed" ? "pass" : "fail_error";
+  const rows = ctx.db.query("SELECT id, kind, url, events FROM webhooks WHERE enabled = 1").all() as WebhookRow[];
+
+  for (const row of rows) {
+    const events = JSON.parse(row.events) as string[];
+    const matches = category === "pass" ? events.includes("pass") : events.includes("fail") || events.includes("error");
+    if (!matches) continue;
+
+    fetch(row.url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(webhookBody(row.kind, ctx.slug, runId, status)),
+    }).catch((err) => console.error(`[webhook ${row.id}] delivery failed:`, (err as Error).message));
+  }
 }

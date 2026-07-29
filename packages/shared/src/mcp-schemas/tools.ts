@@ -178,16 +178,26 @@ export type ToolName = keyof typeof toolSchemas;
 export type ToolInput<N extends ToolName> = z.infer<(typeof toolSchemas)[N]["input"]>;
 export type ToolOutput<N extends ToolName> = z.infer<(typeof toolSchemas)[N]["output"]>;
 
+/** All 18 tools now have a real handler — kept as an explicit list (rather than deriving it from the registry) so a future new tool defaults to "needs a decision", not silently "implemented". */
 export const IMPLEMENTED_TOOLS: ToolName[] = [
   "inspect_page",
   "create_test",
   "list_tests",
   "read_test",
   "update_test",
+  "delete_test",
   "run_tests",
+  "run_until_pass",
+  "pause_tests",
   "get_status",
   "request_credential",
+  "create_credential",
   "list_credentials",
+  "delete_credential",
+  "set_webhook",
+  "start_pair_debug",
+  "get_pair_debug_context",
+  "stop_pair_debug",
 ];
 
 export { TestSummarySchema, TestDetailSchema, RunTriggerSchema };

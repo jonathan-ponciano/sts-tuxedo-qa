@@ -1,5 +1,6 @@
 import type {
   CredentialMaskedDTO,
+  PairDebugEvent,
   ProjectDTO,
   ProtectionHeaderDTO,
   RunDTO,
@@ -50,4 +51,16 @@ export const api = {
   listProtectionHeaders: (slug: string) => request<{ headers: ProtectionHeaderDTO[] }>(`/projects/${slug}/protection-headers`),
   listWebhooks: (slug: string) => request<{ webhooks: WebhookDTO[] }>(`/projects/${slug}/webhooks`),
   getStatusPageConfig: (slug: string) => request<{ statusPageConfig: StatusPageConfigDTO }>(`/projects/${slug}/status-page-config`),
+
+  startPairDebug: (slug: string, url?: string) =>
+    request<{ sessionId: number; vncWsPath: string }>(`/projects/${slug}/pair-debug/sessions`, {
+      method: "POST",
+      body: JSON.stringify(url ? { url } : {}),
+    }),
+  getPairDebugContext: (slug: string, sessionId: number) =>
+    request<{ events: PairDebugEvent[] }>(`/projects/${slug}/pair-debug/sessions/${sessionId}`),
+  stopPairDebug: (slug: string, sessionId: number) =>
+    request<{ draftTestSource: string; events: PairDebugEvent[] }>(`/projects/${slug}/pair-debug/sessions/${sessionId}`, {
+      method: "DELETE",
+    }),
 };

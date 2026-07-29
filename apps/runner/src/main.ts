@@ -119,6 +119,19 @@ app.get("/internal/pair-debug/sessions/:id/events", (c) => {
   });
 });
 
+// One-shot snapshot (no SSE) — for MCP's get_pair_debug_context, which is a
+// plain request/response tool call, not a streaming client.
+app.get("/internal/pair-debug/sessions/:id/snapshot", (c) => {
+  const sessionId = c.req.param("id");
+  try {
+    const { replay, unsubscribe } = subscribeSession(sessionId, () => {});
+    unsubscribe();
+    return c.json({ events: replay });
+  } catch (err) {
+    return c.json({ error: "pair_debug_session_not_found", message: (err as Error).message }, 404);
+  }
+});
+
 app.delete("/internal/pair-debug/sessions/:id", async (c) => {
   const sessionId = c.req.param("id");
   try {

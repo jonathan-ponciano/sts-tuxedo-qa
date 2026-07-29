@@ -1,11 +1,12 @@
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { ToolInput, ToolOutput } from "@tuxedo-qa/shared";
 import type { ProjectContext } from "../db/project-context.ts";
+import { encryptSecret } from "../crypto/index.ts";
 import { runnerClient } from "../runner-client/index.ts";
 import { computeNextDueAt } from "../runs/schedule.ts";
-import { triggerRun } from "../runs/trigger-run.ts";
-import type { CredentialRow, TestRow, TestRunRow } from "./rows.ts";
+import { awaitRunTerminal, triggerRun } from "../runs/trigger-run.ts";
+import type { CredentialRow, PairDebugSessionRow, TestRow, TestRunRow } from "./rows.ts";
 
 function slugifyFileName(name: string): string {
   const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -128,6 +129,51 @@ export async function runTests(ctx: ProjectContext, input: ToolInput<"run_tests"
   return triggerRun(ctx, { testIds, trigger: "manual" });
 }
 
+export function deleteTest(ctx: ProjectContext, input: ToolInput<"delete_test">): ToolOutput<"delete_test"> {
+  const row = readTestRow(ctx, input.testId);
+  const specPath = join(ctx.specsDir, row.file_path);
+  if (existsSync(specPath)) unlinkSync(specPath);
+  // test_runs rows cascade via the FK (ON DELETE CASCADE in migrations/project/0001_init.sql)
+  ctx.db.run("DELETE FROM tests WHERE id = ?1", [input.testId]);
+  return { deleted: true };
+}
+
+export async function runUntilPass(ctx: ProjectContext, input: ToolInput<"run_until_pass">): Promise<ToolOutput<"run_until_pass">> {
+  let last: { runId: number; status: ToolOutput<"run_until_pass">["status"] } | null = null;
+  let attemptsMade = 0;
+
+  for (let attempt = 1; attempt <= input.maxAttempts; attempt++) {
+    attemptsMade = attempt;
+    const { runId, status: startStatus } = await triggerRun(ctx, {
+      testIds: [input.testId],
+      trigger: "run_until_pass",
+      maxAttempts: input.maxAttempts,
+      attemptNumber: attempt,
+    });
+
+    if (startStatus === "error") {
+      last = { runId, status: "error" };
+      break;
+    }
+
+    const finalRow = await awaitRunTerminal(ctx, runId);
+    last = { runId, status: finalRow.status as ToolOutput<"run_until_pass">["status"] };
+    if (finalRow.status === "passed") break;
+  }
+
+  if (!last) throw new Error("run_until_pass: maxAttempts must be at least 1");
+  return { runId: last.runId, attempts: attemptsMade, status: last.status };
+}
+
+export function pauseTests(ctx: ProjectContext, input: ToolInput<"pause_tests">): ToolOutput<"pause_tests"> {
+  const pausedUntil = new Date(Date.now() + input.minutes * 60_000).toISOString();
+  ctx.db.run(
+    "INSERT INTO meta (key, value) VALUES ('paused_until', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    [pausedUntil],
+  );
+  return { pausedUntil };
+}
+
 export function getStatus(ctx: ProjectContext, input: ToolInput<"get_status">): ToolOutput<"get_status"> {
   if (input.testId !== undefined) {
     const row = readTestRow(ctx, input.testId);
@@ -182,4 +228,89 @@ export function listCredentials(ctx: ProjectContext): ToolOutput<"list_credentia
     .query("SELECT id, name, description, status FROM credentials ORDER BY name")
     .all() as Array<Pick<CredentialRow, "id" | "name" | "description" | "status">>;
   return { credentials: rows };
+}
+
+/**
+ * For values the user already pasted into the conversation themselves —
+ * unlike request_credential, this one DOES carry a plaintext value through
+ * the MCP boundary, by the user's own choice, not the default flow.
+ */
+export function createCredential(ctx: ProjectContext, input: ToolInput<"create_credential">): ToolOutput<"create_credential"> {
+  const blob = encryptSecret(input.value);
+  const existing = ctx.db.query("SELECT id FROM credentials WHERE name = ?1").get(input.name) as { id: number } | null;
+
+  if (existing) {
+    ctx.db.run(
+      `UPDATE credentials SET secret_blob = ?1, description = ?2, status = 'fulfilled',
+         fulfilled_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE id = ?3`,
+      [blob, input.description ?? null, existing.id],
+    );
+    return { credentialId: existing.id, status: "fulfilled" };
+  }
+
+  ctx.db.run(
+    "INSERT INTO credentials (name, description, secret_blob, status, fulfilled_at) VALUES (?1, ?2, ?3, 'fulfilled', strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+    [input.name, input.description ?? null, blob],
+  );
+  const { id } = ctx.db.query("SELECT last_insert_rowid() as id").get() as { id: number };
+  return { credentialId: id, status: "fulfilled" };
+}
+
+export function deleteCredential(ctx: ProjectContext, input: ToolInput<"delete_credential">): ToolOutput<"delete_credential"> {
+  const { changes } = ctx.db.run("DELETE FROM credentials WHERE id = ?1", [input.credentialId]);
+  if (changes === 0) throw new Error(`credential ${input.credentialId} not found`);
+  return { deleted: true };
+}
+
+export function setWebhook(ctx: ProjectContext, input: ToolInput<"set_webhook">): ToolOutput<"set_webhook"> {
+  const { lastInsertRowid } = ctx.db.run(
+    "INSERT INTO webhooks (kind, url, events) VALUES (?1, ?2, ?3)",
+    [input.kind, input.url, JSON.stringify(input.events)],
+  );
+  return { webhookId: Number(lastInsertRowid) };
+}
+
+function readPairDebugSession(ctx: ProjectContext, sessionId: number): PairDebugSessionRow {
+  const row = ctx.db.query("SELECT * FROM pair_debug_sessions WHERE id = ?1").get(sessionId) as PairDebugSessionRow | null;
+  if (!row) throw new Error(`pair-debug session ${sessionId} not found`);
+  return row;
+}
+
+export async function startPairDebug(ctx: ProjectContext, input: ToolInput<"start_pair_debug">): Promise<ToolOutput<"start_pair_debug">> {
+  const { sessionId: runnerSessionId, vncWsPath } = await runnerClient.startPairDebug({ projectSlug: ctx.slug, url: input.url });
+  const { lastInsertRowid } = ctx.db.run(
+    "INSERT INTO pair_debug_sessions (status, runner_session_id) VALUES ('active', ?1)",
+    [runnerSessionId],
+  );
+  return { sessionId: Number(lastInsertRowid), vncWsPath };
+}
+
+export async function getPairDebugContext(ctx: ProjectContext, input: ToolInput<"get_pair_debug_context">): Promise<ToolOutput<"get_pair_debug_context">> {
+  const row = readPairDebugSession(ctx, input.sessionId);
+  if (!row.runner_session_id) return { events: [] };
+  const { events } = await runnerClient.getPairDebugSnapshot(row.runner_session_id);
+  return { events };
+}
+
+export async function stopPairDebug(ctx: ProjectContext, input: ToolInput<"stop_pair_debug">): Promise<ToolOutput<"stop_pair_debug">> {
+  const row = readPairDebugSession(ctx, input.sessionId);
+  if (!row.runner_session_id) throw new Error(`pair-debug session ${input.sessionId} has no active runner session`);
+
+  const { draftTestSource, events } = await runnerClient.stopPairDebug(row.runner_session_id);
+
+  ctx.db.transaction(() => {
+    ctx.db.run(
+      "UPDATE pair_debug_sessions SET status = 'stopped', stopped_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1",
+      [input.sessionId],
+    );
+    for (const event of events) {
+      ctx.db.run(
+        "INSERT INTO pair_debug_events (session_id, seq, ts, type, payload) VALUES (?1, ?2, ?3, ?4, ?5)",
+        [input.sessionId, event.seq, event.ts, event.type, JSON.stringify(event.payload)],
+      );
+    }
+  })();
+
+  return { draftTestSource, events };
 }

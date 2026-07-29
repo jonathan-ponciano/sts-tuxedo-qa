@@ -20,6 +20,9 @@ export function ProjectShell() {
         <NavLink to={`/projects/${slug}/status-page`} className={({ isActive }) => (isActive ? "active" : "")}>
           Status Page
         </NavLink>
+        <NavLink to={`/projects/${slug}/pair-debug`} className={({ isActive }) => (isActive ? "active" : "")}>
+          Pair Debug
+        </NavLink>
       </nav>
       <Outlet />
     </div>

@@ -3,6 +3,7 @@ import type {
   DryRunResponse,
   InspectPageRequest,
   InspectPageResponse,
+  PairDebugEvent,
   PairDebugStartRequest,
   PairDebugStartResponse,
   PairDebugStopResponse,
@@ -33,6 +34,11 @@ export const runnerClient = {
     const res = await fetch(`${config.runnerBaseUrl}/internal/pair-debug/sessions/${sessionId}`, { method: "DELETE" });
     if (!res.ok) throw new Error(`runner pair-debug stop failed: ${res.status}`);
     return (await res.json()) as PairDebugStopResponse;
+  },
+  getPairDebugSnapshot: async (sessionId: string): Promise<{ events: PairDebugEvent[] }> => {
+    const res = await fetch(`${config.runnerBaseUrl}/internal/pair-debug/sessions/${sessionId}/snapshot`);
+    if (!res.ok) throw new Error(`runner pair-debug snapshot failed: ${res.status}`);
+    return (await res.json()) as { events: PairDebugEvent[] };
   },
   health: async (): Promise<RunnerHealthResponse> => {
     const res = await fetch(`${config.runnerBaseUrl}/internal/health`);
