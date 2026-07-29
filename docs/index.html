@@ -547,14 +547,22 @@ footer a { color: var(--ink); text-decoration: underline; }
       <p>Rode <code>gemini mcp list</code> pra confirmar que o servidor conectou antes de pedir pra ele escrever o primeiro teste.</p>
 
       <h3>7. (Opcional) Instalar a skill do tuxedo-qa</h3>
-      <p>O repositório inclui uma <a href="https://github.com/jonathan-ponciano/sts-tuxedo-qa/tree/main/skills/tuxedo-qa" target="_blank" rel="noopener">Claude Code Skill</a> com a ordem certa de chamada das 18 ferramentas — quando usar <code>run_until_pass</code> em vez de repetir <code>run_tests</code> manualmente, quando reaproveitar o retorno de <code>create_test</code>/<code>update_test</code> em vez de chamar <code>list_tests</code> de novo, e a regra de nunca colar valor de credencial na conversa. Copie a pasta pra ativar:</p>
+      <p>O repositório inclui uma <a href="https://github.com/jonathan-ponciano/sts-tuxedo-qa/tree/main/skills/tuxedo-qa" target="_blank" rel="noopener">Gemini skill</a> com a ordem certa de chamada das 18 ferramentas — quando usar <code>run_until_pass</code> em vez de repetir <code>run_tests</code> manualmente, quando reaproveitar o retorno de <code>create_test</code>/<code>update_test</code> em vez de chamar <code>list_tests</code> de novo, e a regra de nunca colar valor de credencial na conversa. Puxa direto do GitHub — não precisa ter clonado o repo:</p>
       <div class="terminal">
 <span class="c">// escopo do projeto</span>
-<div class="cmd">cp -r skills/tuxedo-qa .claude/skills/tuxedo-qa</div>
+<div class="cmd">mkdir -p .claude/skills/tuxedo-qa &amp;&amp; curl -fsSL https://raw.githubusercontent.com/jonathan-ponciano/sts-tuxedo-qa/main/skills/tuxedo-qa/SKILL.md -o .claude/skills/tuxedo-qa/SKILL.md</div>
 <span class="c">// ou escopo global, disponível em qualquer projeto</span>
-<div class="cmd">cp -r skills/tuxedo-qa ~/.claude/skills/tuxedo-qa</div>
+<div class="cmd">mkdir -p ~/.claude/skills/tuxedo-qa &amp;&amp; curl -fsSL https://raw.githubusercontent.com/jonathan-ponciano/sts-tuxedo-qa/main/skills/tuxedo-qa/SKILL.md -o ~/.claude/skills/tuxedo-qa/SKILL.md</div>
       </div>
-      <p>Sem cliente MCP dedicado pra skills (caso do Gemini CLI hoje), cole o conteúdo de <code>skills/tuxedo-qa/SKILL.md</code> como instrução de sistema/contexto do projeto — o texto não depende do runtime do Claude Code pra fazer sentido.</p>
+      <p>Já com o repo clonado, <code>cp -r skills/tuxedo-qa .claude/skills/tuxedo-qa</code> faz o mesmo sem sair da rede.</p>
+      <p>O Gemini CLI não tem carregador de skill, mas tem o equivalente do <code>CLAUDE.md</code>: um <code>GEMINI.md</code> carregado sozinho a cada sessão. É só jogar o corpo do arquivo (pulando o frontmatter) lá dentro:</p>
+      <div class="terminal">
+<span class="c">// escopo do projeto</span>
+<div class="cmd">curl -fsSL https://raw.githubusercontent.com/jonathan-ponciano/sts-tuxedo-qa/main/skills/tuxedo-qa/SKILL.md | tail -n +5 &gt;&gt; GEMINI.md</div>
+<span class="c">// ou escopo global, disponível em qualquer projeto</span>
+<div class="cmd">curl -fsSL https://raw.githubusercontent.com/jonathan-ponciano/sts-tuxedo-qa/main/skills/tuxedo-qa/SKILL.md | tail -n +5 &gt;&gt; ~/.gemini/GEMINI.md</div>
+      </div>
+      <p>Confirma com <code>/memory show</code> dentro do Gemini CLI antes de contar com isso.</p>
     </div>
   </div>
 </section>

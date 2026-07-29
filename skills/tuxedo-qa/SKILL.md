@@ -84,3 +84,23 @@ required step between start and stop.
   without the human needing to ask `get_status` each time.
 - `delete_test` is irreversible and drops run history; if the goal is "stop
   running this for now," use `update_test` with `schedule: null` instead.
+
+## Using this outside Claude Code (e.g. Gemini CLI)
+
+This file is a Claude Code Skill — Gemini CLI has no equivalent loader, so
+the `---` frontmatter above won't do anything there. The rules themselves
+aren't Claude-specific, though: they hold for any MCP client talking to
+tuxedo-qa. To get the same effect in Gemini CLI, drop everything from
+`# tuxedo-qa MCP` down (skip the frontmatter block) into a `GEMINI.md`
+context file, which Gemini CLI loads automatically every session:
+
+```
+// project-scoped — only applies inside this repo
+cat skills/tuxedo-qa/SKILL.md | tail -n +5 >> GEMINI.md
+
+// or global — applies to every project connected to a tuxedo-qa server
+cat skills/tuxedo-qa/SKILL.md | tail -n +5 >> ~/.gemini/GEMINI.md
+```
+
+Verify it loaded with `/memory show` inside the Gemini CLI session before
+relying on it.
