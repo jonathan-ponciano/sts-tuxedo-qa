@@ -17,6 +17,9 @@ export function ProjectShell() {
         <NavLink to={`/projects/${slug}/protection`} className={({ isActive }) => (isActive ? "active" : "")}>
           Proteção
         </NavLink>
+        <NavLink to={`/projects/${slug}/webhooks`} className={({ isActive }) => (isActive ? "active" : "")}>
+          Webhooks
+        </NavLink>
         <NavLink to={`/projects/${slug}/status-page`} className={({ isActive }) => (isActive ? "active" : "")}>
           Status Page
         </NavLink>

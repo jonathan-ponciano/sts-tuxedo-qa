@@ -3,6 +3,7 @@ import type {
   PairDebugEvent,
   ProjectDTO,
   ProtectionHeaderDTO,
+  PublicStatusPageDTO,
   RunDTO,
   StatusPageConfigDTO,
   TestDetailDTO,
@@ -49,8 +50,28 @@ export const api = {
     request<{ deleted: true }>(`/projects/${slug}/credentials/${id}`, { method: "DELETE" }),
 
   listProtectionHeaders: (slug: string) => request<{ headers: ProtectionHeaderDTO[] }>(`/projects/${slug}/protection-headers`),
+  createProtectionHeader: (slug: string, headerName: string, value: string) =>
+    request<{ headerId: number }>(`/projects/${slug}/protection-headers`, {
+      method: "POST",
+      body: JSON.stringify({ headerName, value }),
+    }),
+  setProtectionHeaderEnabled: (slug: string, id: number, enabled: boolean) =>
+    request<{ ok: true }>(`/projects/${slug}/protection-headers/${id}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+  deleteProtectionHeader: (slug: string, id: number) =>
+    request<{ deleted: true }>(`/projects/${slug}/protection-headers/${id}`, { method: "DELETE" }),
+
   listWebhooks: (slug: string) => request<{ webhooks: WebhookDTO[] }>(`/projects/${slug}/webhooks`),
+  createWebhook: (slug: string, body: { kind: string; url: string; events: string[] }) =>
+    request<{ webhookId: number }>(`/projects/${slug}/webhooks`, { method: "POST", body: JSON.stringify(body) }),
+  setWebhookEnabled: (slug: string, id: number, enabled: boolean) =>
+    request<{ ok: true }>(`/projects/${slug}/webhooks/${id}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+  deleteWebhook: (slug: string, id: number) =>
+    request<{ deleted: true }>(`/projects/${slug}/webhooks/${id}`, { method: "DELETE" }),
+
   getStatusPageConfig: (slug: string) => request<{ statusPageConfig: StatusPageConfigDTO }>(`/projects/${slug}/status-page-config`),
+  saveStatusPageConfig: (slug: string, body: StatusPageConfigDTO) =>
+    request<{ ok: true }>(`/projects/${slug}/status-page-config`, { method: "PUT", body: JSON.stringify(body) }),
+  getPublicStatus: (pageSlug: string) => request<PublicStatusPageDTO>(`/public/status/${pageSlug}`),
 
   startPairDebug: (slug: string, url?: string) =>
     request<{ sessionId: number; vncWsPath: string }>(`/projects/${slug}/pair-debug/sessions`, {

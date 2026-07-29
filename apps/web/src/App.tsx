@@ -5,12 +5,15 @@ import { Monitor } from "./pages/Monitor.tsx";
 import { PairDebug } from "./pages/PairDebug.tsx";
 import { ProjectShell } from "./pages/ProjectShell.tsx";
 import { Protection } from "./pages/Protection.tsx";
+import { PublicStatus } from "./pages/PublicStatus.tsx";
 import { StatusPageAdmin } from "./pages/StatusPageAdmin.tsx";
 import { Tests } from "./pages/Tests.tsx";
+import { Webhooks } from "./pages/Webhooks.tsx";
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/status/:pageSlug" element={<PublicStatus />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Monitor />} />
         <Route path="projects/:slug" element={<ProjectShell />}>
@@ -18,6 +21,7 @@ export default function App() {
           <Route path="tests" element={<Tests />} />
           <Route path="credentials" element={<Credentials />} />
           <Route path="protection" element={<Protection />} />
+          <Route path="webhooks" element={<Webhooks />} />
           <Route path="status-page" element={<StatusPageAdmin />} />
           <Route path="pair-debug" element={<PairDebug />} />
         </Route>
