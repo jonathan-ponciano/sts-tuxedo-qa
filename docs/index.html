@@ -527,6 +527,34 @@ footer a { color: var(--ink); text-decoration: underline; }
 }
       </div>
       <p>A partir daí, é só descrever o fluxo pra IA: "monitora o login do meu app" → ela usa <code>inspect_page</code>, escreve o teste com <code>create_test</code>, roda com <code>run_tests</code>. Credencial pedida via <code>request_credential</code> você preenche no dashboard — nunca na conversa.</p>
+
+      <h3>6. Conectar no Gemini CLI</h3>
+      <p>O Gemini CLI fala Streamable HTTP nativamente — o campo é <code>httpUrl</code>, não <code>url</code>. Duas formas de registrar, escolha uma:</p>
+      <div class="terminal">
+<span class="c">// ~/.gemini/settings.json (todos os projetos) ou .gemini/settings.json (só este projeto)</span>
+{
+  "mcpServers": {
+    "tuxedo-qa": {
+      "httpUrl": "http://localhost:3000/mcp/meu-app"
+    }
+  }
+}
+      </div>
+      <div class="terminal">
+<span class="c">// ou direto pela CLI, sem editar o JSON à mão</span>
+<div class="cmd">gemini mcp add --transport http tuxedo-qa http://localhost:3000/mcp/meu-app</div>
+      </div>
+      <p>Rode <code>gemini mcp list</code> pra confirmar que o servidor conectou antes de pedir pra ele escrever o primeiro teste.</p>
+
+      <h3>7. (Opcional) Instalar a skill do tuxedo-qa</h3>
+      <p>O repositório inclui uma <a href="https://github.com/jonathan-ponciano/sts-tuxedo-qa/tree/main/skills/tuxedo-qa" target="_blank" rel="noopener">Claude Code Skill</a> com a ordem certa de chamada das 18 ferramentas — quando usar <code>run_until_pass</code> em vez de repetir <code>run_tests</code> manualmente, quando reaproveitar o retorno de <code>create_test</code>/<code>update_test</code> em vez de chamar <code>list_tests</code> de novo, e a regra de nunca colar valor de credencial na conversa. Copie a pasta pra ativar:</p>
+      <div class="terminal">
+<span class="c">// escopo do projeto</span>
+<div class="cmd">cp -r skills/tuxedo-qa .claude/skills/tuxedo-qa</div>
+<span class="c">// ou escopo global, disponível em qualquer projeto</span>
+<div class="cmd">cp -r skills/tuxedo-qa ~/.claude/skills/tuxedo-qa</div>
+      </div>
+      <p>Sem cliente MCP dedicado pra skills (caso do Gemini CLI hoje), cole o conteúdo de <code>skills/tuxedo-qa/SKILL.md</code> como instrução de sistema/contexto do projeto — o texto não depende do runtime do Claude Code pra fazer sentido.</p>
     </div>
   </div>
 </section>
