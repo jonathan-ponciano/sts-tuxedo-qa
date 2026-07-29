@@ -32,11 +32,23 @@ webhooksRouter.post("/", async (c) => {
   const ctx = c.get("project");
   const parsed = createSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
+
+  // Upsert on (kind, url) — same reasoning as MCP's set_webhook: re-submitting
+  // the same endpoint with different events should replace, not stack a
+  // second active webhook that would double-fire every notification.
+  const existing = ctx.db.query("SELECT id FROM webhooks WHERE kind = ?1 AND url = ?2").get(parsed.data.kind, parsed.data.url) as
+    | { id: number }
+    | null;
+  if (existing) {
+    ctx.db.run("UPDATE webhooks SET events = ?1, enabled = 1 WHERE id = ?2", [JSON.stringify(parsed.data.events), existing.id]);
+    return c.json({ webhookId: existing.id }, 200);
+  }
+
   const { lastInsertRowid } = ctx.db.run(
     "INSERT INTO webhooks (kind, url, events) VALUES (?1, ?2, ?3)",
     [parsed.data.kind, parsed.data.url, JSON.stringify(parsed.data.events)],
   );
-  return c.json({ webhookId: lastInsertRowid }, 201);
+  return c.json({ webhookId: Number(lastInsertRowid) }, 201);
 });
 
 const patchSchema = z.object({ enabled: z.boolean() });

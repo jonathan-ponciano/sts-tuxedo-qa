@@ -272,7 +272,19 @@ export function deleteCredential(ctx: ProjectContext, input: ToolInput<"delete_c
   return { deleted: true };
 }
 
+/**
+ * "set" (not "add") — upserts on (kind, url) so calling this again to tweak
+ * events or re-enable a webhook updates the existing row instead of stacking
+ * a second active one that would double-fire every notification.
+ */
 export function setWebhook(ctx: ProjectContext, input: ToolInput<"set_webhook">): ToolOutput<"set_webhook"> {
+  const existing = ctx.db.query("SELECT id FROM webhooks WHERE kind = ?1 AND url = ?2").get(input.kind, input.url) as
+    | { id: number }
+    | null;
+  if (existing) {
+    ctx.db.run("UPDATE webhooks SET events = ?1, enabled = 1 WHERE id = ?2", [JSON.stringify(input.events), existing.id]);
+    return { webhookId: existing.id };
+  }
   const { lastInsertRowid } = ctx.db.run(
     "INSERT INTO webhooks (kind, url, events) VALUES (?1, ?2, ?3)",
     [input.kind, input.url, JSON.stringify(input.events)],

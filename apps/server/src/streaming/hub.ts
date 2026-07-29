@@ -153,7 +153,15 @@ export async function bridgeRunnerEvents(ctx: ProjectContext, runId: number): Pr
   }
 }
 
-function applyTerminalStatus(ctx: ProjectContext, runId: number, status: TerminalStatus): void {
+/**
+ * The one place that finalizes a run's terminal status — DB update, `tests`
+ * row sync, stats refresh, and webhook dispatch. Called both from the normal
+ * SSE-bridging path above (a run that actually reached the runner) and
+ * directly from trigger-run.ts's catch block (a run that never made it out
+ * of `app`, e.g. runner unreachable) so "error" webhooks fire for THAT case
+ * too, not just runner-reported failures.
+ */
+export function applyTerminalStatus(ctx: ProjectContext, runId: number, status: TerminalStatus): void {
   const run = ctx.db.query("SELECT test_id, started_at FROM test_runs WHERE id = ?1").get(runId) as
     | { test_id: number | null; started_at: string }
     | null;
@@ -191,20 +199,33 @@ function webhookBody(kind: WebhookRow["kind"], slug: string, runId: number, stat
   return { slug, runId, status };
 }
 
+const WEBHOOK_DELIVERY_TIMEOUT_MS = 5_000;
+
+/**
+ * "timeout" has no dedicated entry in the tool schema's events enum
+ * (pass/fail/error) — folded into "error" here since a run that never
+ * finished is an infra condition, not a failed assertion.
+ */
+function webhookCategory(status: TerminalStatus): "pass" | "fail" | "error" {
+  if (status === "passed") return "pass";
+  if (status === "failed") return "fail";
+  return "error";
+}
+
 /** Fire-and-forget: a slow or dead webhook endpoint must never block finishing a run. */
 async function fireWebhooks(ctx: ProjectContext, runId: number, status: TerminalStatus): Promise<void> {
-  const category = status === "passed" ? "pass" : "fail_error";
+  const category = webhookCategory(status);
   const rows = ctx.db.query("SELECT id, kind, url, events FROM webhooks WHERE enabled = 1").all() as WebhookRow[];
 
   for (const row of rows) {
     const events = JSON.parse(row.events) as string[];
-    const matches = category === "pass" ? events.includes("pass") : events.includes("fail") || events.includes("error");
-    if (!matches) continue;
+    if (!events.includes(category)) continue;
 
     fetch(row.url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(webhookBody(row.kind, ctx.slug, runId, status)),
+      signal: AbortSignal.timeout(WEBHOOK_DELIVERY_TIMEOUT_MS),
     }).catch((err) => console.error(`[webhook ${row.id}] delivery failed:`, (err as Error).message));
   }
 }

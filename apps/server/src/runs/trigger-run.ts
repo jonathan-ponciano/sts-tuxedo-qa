@@ -2,7 +2,7 @@ import type { RunStatus, RunTrigger } from "@tuxedo-qa/shared";
 import type { ProjectContext } from "../db/project-context.ts";
 import { getEnabledProtectionHeaders } from "../protection/headers.ts";
 import { runnerClient } from "../runner-client/index.ts";
-import { bridgeRunnerEvents } from "../streaming/hub.ts";
+import { applyTerminalStatus, bridgeRunnerEvents } from "../streaming/hub.ts";
 
 export interface TriggerRunOptions {
   testIds?: number[];
@@ -79,13 +79,10 @@ export async function triggerRun(ctx: ProjectContext, opts: TriggerRunOptions): 
     void bridgeRunnerEvents(ctx, runId);
     return { runId, status: "running" };
   } catch (err) {
-    ctx.db.run(
-      "UPDATE test_runs SET status = 'error', finished_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1",
-      [runId],
-    );
-    if (singleTestId !== undefined) {
-      ctx.db.run("UPDATE tests SET last_run_status = 'error' WHERE id = ?1", [singleTestId]);
-    }
+    // Same finalization path a runner-reported failure goes through (DB
+    // update, stats refresh, webhook dispatch) — this run never reached the
+    // runner at all, but "error" webhooks still need to fire for it.
+    applyTerminalStatus(ctx, runId, "error");
     return { runId, status: "error" };
   }
 }
