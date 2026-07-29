@@ -1,5 +1,6 @@
 import { chromium, type Page } from "playwright";
 import type { Action, ElementInfo, InspectPageRequest, InspectPageResponse, NetworkEntry } from "@tuxedo-qa/shared";
+import { attachNetworkCapture } from "./network-capture.ts";
 
 const INTERACTIVE_SELECTOR =
   "a, button, input, select, textarea, [role=button], [role=link], [role=textbox], [contenteditable=true]";
@@ -44,18 +45,14 @@ export async function inspectPage(req: InspectPageRequest): Promise<InspectPageR
   try {
     const context = await browser.newContext({ extraHTTPHeaders: req.headers });
     const page = await context.newPage();
-    page.on("response", (res) => {
-      network.push({
-        method: res.request().method(),
-        url: res.url(),
-        status: res.status(),
-        resourceType: res.request().resourceType(),
-        timestamp: Date.now(),
-      });
-    });
+    attachNetworkCapture(page, (entry) => network.push(entry));
 
     await page.goto(req.url, { waitUntil: "domcontentloaded" });
     for (const action of req.actions ?? []) await applyAction(page, action);
+    // Response bodies are read asynchronously off the `response` event; give
+    // the last action's XHR/fetch calls a moment to actually resolve before
+    // we scrape elements and screenshot, or their bodies show up empty.
+    await page.waitForTimeout(500);
 
     const raw = (await page.$$eval(INTERACTIVE_SELECTOR, (nodes) =>
       nodes.slice(0, 200).map((el) => {

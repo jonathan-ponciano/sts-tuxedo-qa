@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { chromium, type Browser, type Page } from "playwright";
 import type { PairDebugEvent } from "@tuxedo-qa/shared";
+import { attachNetworkCapture } from "../playwright/network-capture.ts";
 
 interface Session {
   id: string;
@@ -46,7 +47,11 @@ export async function startSession(
   sessions.set(id, session);
 
   page.on("console", (msg) => record(session, "console", { text: msg.text(), level: msg.type() }));
-  page.on("request", (req) => record(session, "network", { method: req.method(), url: req.url() }));
+  // Fired at response time (not request time) so status + body are available —
+  // includes request/response bodies for xhr/fetch, letting whoever calls
+  // get_pair_debug_context actually see the BFF/analytics payloads the human
+  // triggered while driving, not just "a request happened".
+  attachNetworkCapture(page, (entry) => record(session, "network", entry));
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) record(session, "nav", { url: frame.url() });
   });

@@ -29,6 +29,11 @@ export const NetworkEntrySchema = z.object({
   status: z.number().nullable(),
   resourceType: z.string(),
   timestamp: z.number(),
+  // Only populated for xhr/fetch — capturing bodies for every asset request
+  // (images, JS bundles, fonts) would be wasteful and mostly noise. Truncated
+  // to keep MCP responses/pair-debug timelines from ballooning on large payloads.
+  requestBody: z.string().nullable().optional(),
+  responseBody: z.string().nullable().optional(),
 });
 export type NetworkEntry = z.infer<typeof NetworkEntrySchema>;
 
