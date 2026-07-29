@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
 import { ProjectNotFoundError, resolveProject } from "../db/project-context.ts";
+import { touchMcpConnected } from "../db/registry.ts";
 import { createMcpServerForProject } from "./register.ts";
 
 export const mcpRoute = new Hono();
@@ -22,6 +23,8 @@ mcpRoute.all("/:slug", async (c) => {
     }
     throw err;
   }
+
+  touchMcpConnected(ctx.id);
 
   const transport = new WebStandardStreamableHTTPServerTransport();
   const server = createMcpServerForProject(ctx);

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout.tsx";
+import { ConnectAI } from "./pages/ConnectAI.tsx";
 import { Credentials } from "./pages/Credentials.tsx";
 import { Monitor } from "./pages/Monitor.tsx";
 import { PairDebug } from "./pages/PairDebug.tsx";
@@ -18,6 +19,7 @@ export default function App() {
         <Route index element={<Monitor />} />
         <Route path="projects/:slug" element={<ProjectShell />}>
           <Route index element={<Navigate to="tests" replace />} />
+          <Route path="connect" element={<ConnectAI />} />
           <Route path="tests" element={<Tests />} />
           <Route path="credentials" element={<Credentials />} />
           <Route path="protection" element={<Protection />} />

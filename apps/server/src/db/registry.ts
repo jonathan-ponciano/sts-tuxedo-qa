@@ -26,6 +26,7 @@ export interface ProjectRow {
   created_at: string;
   disabled_at: string | null;
   last_seen_at: string | null;
+  mcp_last_connected_at: string | null;
 }
 
 export interface ProjectStatsRow {
@@ -85,6 +86,20 @@ export function createProject(slug: string, name: string, dbPath: string): Proje
 export function touchProjectSeen(id: number): void {
   getRegistryDb().run(
     "UPDATE projects SET last_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1",
+    [id],
+  );
+}
+
+/**
+ * Touched ONLY by the /mcp/:slug route (see mcp/route.ts) — deliberately
+ * separate from `touchProjectSeen`, which the dashboard's own REST traffic
+ * also triggers. This is the one signal that specifically means "an MCP
+ * client actually hit this project's endpoint", which is what the
+ * dashboard's connection-status indicator needs.
+ */
+export function touchMcpConnected(id: number): void {
+  getRegistryDb().run(
+    "UPDATE projects SET mcp_last_connected_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1",
     [id],
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import type { RunStatus, TestDetailDTO, TestDTO } from "@tuxedo-qa/shared";
 import { api } from "../lib/api.ts";
 import { useRunStream } from "../lib/useRunStream.ts";
@@ -68,7 +68,10 @@ export function Tests() {
         {!tests ? (
           <p className="muted">Carregando…</p>
         ) : tests.length === 0 ? (
-          <p className="muted">Nenhum teste ainda. Peça ao assistente de IA para criar um via MCP (create_test).</p>
+          <p className="muted">
+            Nenhum teste ainda. Peça ao assistente de IA para criar um (ferramenta <code>create_test</code>) — veja{" "}
+            <Link to={`/projects/${slug}/connect`}>como conectar a IA</Link> se ainda não configurou.
+          </p>
         ) : (
           <table>
             <thead>

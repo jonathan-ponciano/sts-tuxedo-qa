@@ -73,6 +73,8 @@ export const api = {
     request<{ ok: true }>(`/projects/${slug}/status-page-config`, { method: "PUT", body: JSON.stringify(body) }),
   getPublicStatus: (pageSlug: string) => request<PublicStatusPageDTO>(`/public/status/${pageSlug}`),
 
+  getMcpStatus: (slug: string) => request<{ lastConnectedAt: string | null }>(`/projects/${slug}/mcp-status`),
+
   startPairDebug: (slug: string, url?: string) =>
     request<{ sessionId: number; vncWsPath: string }>(`/projects/${slug}/pair-debug/sessions`, {
       method: "POST",

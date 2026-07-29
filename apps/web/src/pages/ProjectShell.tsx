@@ -8,6 +8,9 @@ export function ProjectShell() {
     <div>
       <h1>{slug}</h1>
       <nav className="tabs">
+        <NavLink to={`/projects/${slug}/connect`} className={({ isActive }) => (isActive ? "active" : "")}>
+          Conectar IA
+        </NavLink>
         <NavLink to={`/projects/${slug}/tests`} className={({ isActive }) => (isActive ? "active" : "")}>
           Testes
         </NavLink>
