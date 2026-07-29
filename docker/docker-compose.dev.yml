@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      target: deps
+    command: ["bun", "run", "--watch", "src/main.ts"]
+    volumes:
+      - ../data:/data
+      - ../apps/server/src:/app/apps/server/src
+      - ../apps/server/migrations:/app/apps/server/migrations
+      - ../packages/shared/src:/app/packages/shared/src
+
+  runner:
+    volumes:
+      - ../data:/data
+      - ../apps/runner/src:/app/apps/runner/src
+      - ../packages/shared/src:/app/packages/shared/src
+
+  # Vite dev server for the SPA (HMR). Not part of the prod topology — the
+  # SPA is baked into `app`'s image there. Proxies /api and /mcp to `app`.
+  web:
+    image: oven/bun:1-slim
+    working_dir: /app/apps/web
+    command: ["sh", "-c", "bun install --frozen-lockfile && bun run dev --host"]
+    volumes:
+      - ..:/app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_PROXY_TARGET=http://app:3000
+    depends_on:
+      - app

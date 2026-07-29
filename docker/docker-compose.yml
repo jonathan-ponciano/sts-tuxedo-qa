@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATA_DIR=/data
+      - RUNNER_BASE_URL=http://runner:4000
+      - PUBLIC_BASE_URL=http://localhost:3000
+    volumes:
+      - ../data:/data
+    depends_on:
+      runner:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Internal-only: no `ports:` entry. `app` is the single published surface;
+  # it reverse-proxies the noVNC websocket through to this service.
+  runner:
+    build:
+      context: ..
+      dockerfile: apps/runner/Dockerfile
+    environment:
+      - PORT=4000
+      - DATA_DIR=/data
+    volumes:
+      - ../data:/data
+    restart: unless-stopped

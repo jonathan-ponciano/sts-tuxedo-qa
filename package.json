@@ -1,0 +1,19 @@
+{
+  "name": "tuxedo-qa",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up --build",
+    "dev:down": "docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down",
+    "prod": "docker compose -f docker/docker-compose.yml up --build",
+    "typecheck": "bun run --filter='*' typecheck",
+    "test": "bun run --filter='*' test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
