@@ -11,6 +11,9 @@ export function ProjectShell() {
         <NavLink to={`/projects/${slug}/chat`} className={({ isActive }) => (isActive ? "active" : "")}>
           Chat
         </NavLink>
+        <NavLink to={`/projects/${slug}/repository`} className={({ isActive }) => (isActive ? "active" : "")}>
+          Repositório
+        </NavLink>
         <NavLink to={`/projects/${slug}/connect`} className={({ isActive }) => (isActive ? "active" : "")}>
           Conectar IA
         </NavLink>

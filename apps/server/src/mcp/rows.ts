@@ -75,3 +75,20 @@ export interface AgentRunRow {
   started_at: string;
   finished_at: string | null;
 }
+
+export interface SandboxRow {
+  id: number;
+  status: "provisioning" | "running" | "error" | "stopped";
+  branch: string;
+  // Despite the column name, this holds the RUNNER's internal sandbox id
+  // (what /internal/sandbox/:id/* on the runner expects) — not literally
+  // `docker ps`'s container name. Named to match the migration; renaming now
+  // would just be churn for something not yet deployed anywhere real.
+  container_name: string | null;
+  network_name: string | null;
+  internal_base_url: string | null;
+  error_message: string | null;
+  created_at: string;
+  expires_at: string;
+  stopped_at: string | null;
+}

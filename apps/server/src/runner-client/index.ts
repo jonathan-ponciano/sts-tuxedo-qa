@@ -12,6 +12,8 @@ import type {
   PairDebugStopResponse,
   RunRequest,
   RunnerHealthResponse,
+  SandboxProvisionRequest,
+  SandboxProvisionResponse,
 } from "@tuxedo-qa/shared";
 import { config } from "../config.ts";
 
@@ -72,5 +74,15 @@ export const runnerClient = {
       const text = await res.text().catch(() => "");
       throw new Error(`runner pair-debug input failed: ${res.status} ${text}`);
     }
+  },
+  provisionSandbox: (req: SandboxProvisionRequest) => post<SandboxProvisionRequest, SandboxProvisionResponse>("/internal/sandbox", req),
+  checkSandboxHealth: async (sandboxId: string): Promise<boolean> => {
+    const res = await fetch(`${config.runnerBaseUrl}/internal/sandbox/${sandboxId}/health`);
+    if (!res.ok) return false;
+    const body = (await res.json()) as { healthy: boolean };
+    return body.healthy;
+  },
+  teardownSandbox: async (sandboxId: string): Promise<void> => {
+    await fetch(`${config.runnerBaseUrl}/internal/sandbox/${sandboxId}`, { method: "DELETE" });
   },
 };

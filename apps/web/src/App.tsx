@@ -9,6 +9,7 @@ import { Monitor } from "./pages/Monitor.tsx";
 import { PairDebug } from "./pages/PairDebug.tsx";
 import { ProjectShell } from "./pages/ProjectShell.tsx";
 import { Protection } from "./pages/Protection.tsx";
+import { Repository } from "./pages/Repository.tsx";
 import { PublicStatus } from "./pages/PublicStatus.tsx";
 import { Settings } from "./pages/Settings.tsx";
 import { StatusPageAdmin } from "./pages/StatusPageAdmin.tsx";
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="projects/:slug" element={<ProjectShell />}>
           <Route index element={<Navigate to="chat" replace />} />
           <Route path="chat" element={<Chat />} />
+          <Route path="repository" element={<Repository />} />
           <Route path="connect" element={<ConnectAI />} />
           <Route path="tests" element={<Tests />} />
           <Route path="credentials" element={<Credentials />} />

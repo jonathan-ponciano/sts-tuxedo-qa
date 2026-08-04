@@ -87,3 +87,17 @@ export interface RunnerHealthResponse {
   ok: true;
   browsersReady: boolean;
 }
+
+export interface SandboxProvisionRequest {
+  provider: "local" | "github";
+  localPath?: string;
+  remoteUrl?: string;
+  pat?: string;
+  branch: string;
+  buildMethod: "dockerfile" | "node";
+  port: number;
+}
+export interface SandboxProvisionResponse {
+  sandboxId: string;
+  internalBaseUrl: string;
+}

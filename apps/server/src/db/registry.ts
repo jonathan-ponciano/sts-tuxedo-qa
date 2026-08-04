@@ -271,3 +271,96 @@ export function listLlmCredentialProviders(accountId: number): LlmProvider[] {
 export function deleteLlmCredential(accountId: number, provider: LlmProvider): void {
   getRegistryDb().run("DELETE FROM llm_credentials WHERE account_id = ?1 AND provider = ?2", [accountId, provider]);
 }
+
+// ---- repos / repo_links (Fase 1: repo linking) ----
+
+export type RepoProvider = "local" | "github";
+export type RepoBuildMethod = "dockerfile" | "node";
+
+export interface RepoRow {
+  id: number;
+  account_id: number;
+  provider: RepoProvider;
+  local_path: string | null;
+  remote_url: string | null;
+  default_branch: string;
+  build_method: RepoBuildMethod;
+  port: number;
+  created_at: string;
+}
+
+export interface RepoLinkRow {
+  project_id: number;
+  repo_id: number;
+  branch: string;
+  created_at: string;
+}
+
+export interface CreateRepoInput {
+  accountId: number;
+  provider: RepoProvider;
+  localPath?: string;
+  remoteUrl?: string;
+  defaultBranch: string;
+  buildMethod: RepoBuildMethod;
+  port: number;
+  // Already encrypted by the caller (see api/repos.ts) — registry.ts stays
+  // crypto-agnostic, same convention as llm_credentials.
+  patBlob?: Buffer;
+}
+
+export function createRepo(input: CreateRepoInput): RepoRow {
+  const registryDb = getRegistryDb();
+  const { lastInsertRowid } = registryDb.run(
+    `INSERT INTO repos (account_id, provider, local_path, remote_url, default_branch, build_method, port)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+    [input.accountId, input.provider, input.localPath ?? null, input.remoteUrl ?? null, input.defaultBranch, input.buildMethod, input.port],
+  );
+  const repoId = Number(lastInsertRowid);
+  if (input.patBlob) {
+    registryDb.run("INSERT INTO repo_credentials (repo_id, secret_blob) VALUES (?1, ?2)", [repoId, input.patBlob]);
+  }
+  const row = registryDb.query("SELECT * FROM repos WHERE id = ?1").get(repoId) as RepoRow | null;
+  if (!row) throw new Error("failed to create repo");
+  return row;
+}
+
+export function findRepoById(id: number): RepoRow | null {
+  return getRegistryDb().query("SELECT * FROM repos WHERE id = ?1").get(id) as RepoRow | null;
+}
+
+export function findRepoPatBlob(repoId: number): Buffer | null {
+  const row = getRegistryDb().query("SELECT secret_blob FROM repo_credentials WHERE repo_id = ?1").get(repoId) as
+    | { secret_blob: Uint8Array }
+    | null;
+  return row ? Buffer.from(row.secret_blob) : null;
+}
+
+export function linkRepoToProject(projectId: number, repoId: number, branch: string): RepoLinkRow {
+  getRegistryDb().run(
+    `INSERT INTO repo_links (project_id, repo_id, branch) VALUES (?1, ?2, ?3)
+     ON CONFLICT(project_id) DO UPDATE SET repo_id = excluded.repo_id, branch = excluded.branch`,
+    [projectId, repoId, branch],
+  );
+  const row = getRegistryDb().query("SELECT * FROM repo_links WHERE project_id = ?1").get(projectId) as RepoLinkRow | null;
+  if (!row) throw new Error("failed to link repo");
+  return row;
+}
+
+export function findRepoLinkForProject(projectId: number): (RepoLinkRow & RepoRow) | null {
+  return getRegistryDb()
+    .query(
+      `SELECT r.*, l.project_id, l.repo_id, l.branch, l.created_at as link_created_at
+       FROM repo_links l JOIN repos r ON r.id = l.repo_id
+       WHERE l.project_id = ?1`,
+    )
+    .get(projectId) as (RepoLinkRow & RepoRow) | null;
+}
+
+export function updateRepoLinkBranch(projectId: number, branch: string): void {
+  getRegistryDb().run("UPDATE repo_links SET branch = ?1 WHERE project_id = ?2", [branch, projectId]);
+}
+
+export function unlinkRepoFromProject(projectId: number): void {
+  getRegistryDb().run("DELETE FROM repo_links WHERE project_id = ?1", [projectId]);
+}

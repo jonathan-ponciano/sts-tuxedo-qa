@@ -3,11 +3,36 @@ import { resolveProject } from "../db/project-context.ts";
 import { listProjects } from "../db/registry.ts";
 import { nextDueAtIso } from "../runs/schedule.ts";
 import { triggerRun } from "../runs/trigger-run.ts";
+import { runnerClient } from "../runner-client/index.ts";
 import { refreshProjectStats } from "../streaming/hub.ts";
 
 interface DueTestRow {
   id: number;
   schedule: string;
+}
+
+interface ExpiredSandboxRow {
+  id: number;
+  container_name: string | null;
+}
+
+/**
+ * Fase 1's sandboxes are provisioned manually (a dashboard button) with no
+ * corresponding "stop" guarantee — a user who closes the tab without
+ * clicking "parar" would otherwise leak a container/network forever. Piggy-
+ * backing on the existing per-project tick (rather than a separate interval)
+ * keeps sandbox cleanup on the same cadence as everything else here.
+ */
+async function reapExpiredSandboxes(ctx: ReturnType<typeof resolveProject>): Promise<void> {
+  const expired = ctx.db
+    .query("SELECT id, container_name FROM sandbox_environments WHERE status = 'running' AND expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now')")
+    .all() as ExpiredSandboxRow[];
+  for (const sandbox of expired) {
+    if (sandbox.container_name) await runnerClient.teardownSandbox(sandbox.container_name);
+    ctx.db.run("UPDATE sandbox_environments SET status = 'stopped', stopped_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1", [
+      sandbox.id,
+    ]);
+  }
 }
 
 /**
@@ -47,6 +72,12 @@ async function tick(): Promise<void> {
         const next = nextDueAtIso(test.schedule);
         ctx.db.run("UPDATE tests SET next_due_at = ?1 WHERE id = ?2", [next, test.id]);
       }
+    }
+
+    try {
+      await reapExpiredSandboxes(ctx);
+    } catch (err) {
+      console.error(`[scheduler] sandbox reaper failed for ${projectRow.slug}:`, (err as Error).message);
     }
 
     refreshProjectStats(ctx);

@@ -8,7 +8,9 @@ import { authMiddleware, projectMiddleware } from "./middleware.ts";
 import { pairDebugRouter } from "./pair-debug.ts";
 import { projectsRouter } from "./projects.ts";
 import { protectionHeadersRouter } from "./protection-headers.ts";
+import { repoRouter } from "./repos.ts";
 import { runsRouter } from "./runs.ts";
+import { sandboxRouter } from "./sandbox.ts";
 import { publicStatusRouter, statusPageRouter } from "./status-page.ts";
 import { testsRouter } from "./tests.ts";
 import { webhooksRouter } from "./webhooks.ts";
@@ -38,5 +40,7 @@ projectScoped.route("/status-page-config", statusPageRouter);
 projectScoped.route("/pair-debug", pairDebugRouter);
 projectScoped.route("/mcp-status", mcpStatusRouter);
 projectScoped.route("/chat", chatRouter);
+projectScoped.route("/repo", repoRouter);
+projectScoped.route("/sandbox", sandboxRouter);
 
 apiRoute.route("/projects/:slug", projectScoped);

@@ -117,6 +117,31 @@ export interface ChatMessageDTO {
   createdAt: string;
 }
 
+export interface RepoDTO {
+  id: number;
+  provider: "local" | "github";
+  localPath: string | null;
+  remoteUrl: string | null;
+  buildMethod: "dockerfile" | "node";
+  port: number;
+  hasCredential: boolean;
+}
+
+export interface RepoLinkDTO {
+  repo: RepoDTO;
+  branch: string;
+}
+
+export interface SandboxEnvironmentDTO {
+  id: number;
+  status: "provisioning" | "running" | "error" | "stopped";
+  branch: string;
+  internalBaseUrl: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface PairDebugSessionDTO {
   id: number;
   status: "starting" | "active" | "stopped";

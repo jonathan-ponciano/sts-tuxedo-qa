@@ -7,12 +7,18 @@ import type {
   ProjectDTO,
   ProtectionHeaderDTO,
   PublicStatusPageDTO,
+  RepoLinkDTO,
   RunDTO,
+  SandboxEnvironmentDTO,
   StatusPageConfigDTO,
   TestDetailDTO,
   TestDTO,
   WebhookDTO,
 } from "@tuxedo-qa/shared";
+
+export type LinkRepoBody =
+  | { provider: "local"; localPath: string; branch: string; buildMethod: "dockerfile" | "node"; port: number }
+  | { provider: "github"; remoteUrl: string; pat?: string; branch: string; buildMethod: "dockerfile" | "node"; port: number };
 
 export interface AuthUser {
   id: number;
@@ -128,6 +134,23 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
   chatStreamUrl: (slug: string, threadId: number) => `${BASE}/projects/${slug}/chat/threads/${threadId}/stream`,
+  promoteChatThread: (slug: string, threadId: number) =>
+    request<{ accepted: true }>(`/projects/${slug}/chat/threads/${threadId}/promote`, { method: "POST" }),
+
+  setTestSchedule: (slug: string, testId: number, patch: { enabled?: boolean; branch?: string | null }) =>
+    request<{ test: TestDetailDTO }>(`/projects/${slug}/tests/${testId}/schedule`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  getRepoLink: (slug: string) => request<{ link: RepoLinkDTO | null }>(`/projects/${slug}/repo`),
+  linkRepo: (slug: string, body: LinkRepoBody) =>
+    request<{ link: RepoLinkDTO }>(`/projects/${slug}/repo`, { method: "POST", body: JSON.stringify(body) }),
+  updateRepoBranch: (slug: string, branch: string) =>
+    request<{ link: RepoLinkDTO }>(`/projects/${slug}/repo`, { method: "PATCH", body: JSON.stringify({ branch }) }),
+  unlinkRepo: (slug: string) => request<{ deleted: true }>(`/projects/${slug}/repo`, { method: "DELETE" }),
+
+  getSandbox: (slug: string) => request<{ sandbox: SandboxEnvironmentDTO | null }>(`/projects/${slug}/sandbox`),
+  startSandbox: (slug: string) => request<{ sandbox: SandboxEnvironmentDTO }>(`/projects/${slug}/sandbox`, { method: "POST" }),
+  stopSandbox: (slug: string, sandboxId: number) =>
+    request<{ deleted: true }>(`/projects/${slug}/sandbox/${sandboxId}`, { method: "DELETE" }),
 
   getLlmCredentials: () => request<{ providers: Array<"anthropic" | "gemini"> }>("/account/llm-credentials"),
   saveLlmCredential: (provider: "anthropic" | "gemini", apiKey: string) =>

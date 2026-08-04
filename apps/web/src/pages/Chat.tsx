@@ -123,6 +123,19 @@ export function Chat() {
     setActiveThreadId(thread.id);
   }
 
+  async function handlePromote() {
+    if (!activeThreadId) return;
+    setError(null);
+    setLiveText("");
+    setBusy(true);
+    try {
+      await api.promoteChatThread(projectSlug, activeThreadId);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!activeThreadId || !input.trim()) return;
@@ -168,6 +181,11 @@ export function Chat() {
           <p className="muted">Crie uma conversa para começar.</p>
         ) : (
           <>
+            <div className="form-row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
+              <button onClick={() => void handlePromote()} disabled={busy || items.length === 0}>
+                Salvar fluxo como teste fixo
+              </button>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
               {items.map((item, i) => (
                 <FlatItemView key={i} item={item} />
