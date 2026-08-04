@@ -18,6 +18,9 @@ export interface TestDTO {
   tags: string[];
   validated: boolean;
   schedule: string | null;
+  scheduleEnabled: boolean;
+  sourceThreadId: number | null;
+  branch: string | null;
   lastRunStatus: RunStatus | null;
   lastRunAt: string | null;
   createdBy: "ai" | "human";

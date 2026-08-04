@@ -68,6 +68,35 @@ testsRouter.patch("/:id", async (c) => {
   return c.json({ test: testRowToDetailDTO(updated, existsSync(path) ? readFileSync(path, "utf8") : "") });
 });
 
+// Deliberately separate from the main PATCH /:id (which mirrors the MCP-facing
+// update_test tool almost 1:1) — enabling/disabling a schedule or moving it to
+// a different branch is a human dashboard decision, not something the agent
+// should be able to flip mid-conversation.
+const scheduleSchema = z.object({
+  enabled: z.boolean().optional(),
+  branch: z.string().nullable().optional(),
+});
+
+testsRouter.patch("/:id/schedule", async (c) => {
+  const ctx = c.get("project");
+  const id = Number(c.req.param("id"));
+  const parsed = scheduleSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
+  const { enabled, branch } = parsed.data;
+
+  const existing = ctx.db.query(`${TEST_JOIN} WHERE t.id = ?1`).get(id) as TestRow | null;
+  if (!existing) return c.json({ error: "test_not_found" }, 404);
+
+  ctx.db.run(
+    `UPDATE tests SET schedule_enabled = ?1, branch = ?2, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?3`,
+    [enabled === undefined ? existing.schedule_enabled : Number(enabled), branch === undefined ? existing.branch : branch, id],
+  );
+
+  const updated = ctx.db.query(`${TEST_JOIN} WHERE t.id = ?1`).get(id) as TestRow;
+  const path = join(ctx.specsDir, updated.file_path);
+  return c.json({ test: testRowToDetailDTO(updated, existsSync(path) ? readFileSync(path, "utf8") : "") });
+});
+
 testsRouter.post("/:id/run", async (c) => {
   const ctx = c.get("project");
   const id = Number(c.req.param("id"));

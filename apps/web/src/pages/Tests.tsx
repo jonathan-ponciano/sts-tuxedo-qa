@@ -59,6 +59,13 @@ export function Tests() {
     setActiveRunId(runId);
   }
 
+  async function handleToggleSchedule(testId: number, enabled: boolean) {
+    if (!slug) return;
+    const { test } = await api.setTestSchedule(slug, testId, { enabled });
+    setDetail(test);
+    await refreshList();
+  }
+
   if (!slug) return null;
 
   return (
@@ -111,6 +118,15 @@ export function Tests() {
           <>
             <h2>{detail.name}</h2>
             <p className="muted">{detail.description ?? "sem descrição"}</p>
+            {detail.schedule && (
+              <p>
+                Agendamento: <code>{detail.schedule}</code>{" "}
+                {detail.scheduleEnabled ? <span className="pill ok">ativo</span> : <span className="pill muted">pausado</span>}{" "}
+                <button onClick={() => void handleToggleSchedule(detail.id, !detail.scheduleEnabled)}>
+                  {detail.scheduleEnabled ? "Pausar" : "Ativar"}
+                </button>
+              </p>
+            )}
             <code className="script">{detail.script}</code>
           </>
         )}

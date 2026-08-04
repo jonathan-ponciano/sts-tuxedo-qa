@@ -74,6 +74,28 @@ chatRouter.post("/threads/:id/messages", async (c) => {
   return c.json({ accepted: true }, 202);
 });
 
+const PROMOTE_PROMPT =
+  "Salve o fluxo que validamos nesta conversa como um teste agendado, chamando create_test com um script Playwright " +
+  "baseado exatamente no que fizemos aqui (seletores reais observados, não adivinhados). Escolha um nome e uma " +
+  "descrição claros para o teste.";
+
+// "Salvar como teste fixo" button in Chat.tsx — same 202-then-SSE shape as a
+// normal message, just with a fixed prompt and the resulting test tagged
+// with this thread (see agent-loop.ts's tagCreatedTestsWithThreadId).
+chatRouter.post("/threads/:id/promote", (c) => {
+  const ctx = c.get("project");
+  const threadId = Number(c.req.param("id"));
+  const thread = ctx.db.query("SELECT id FROM chat_threads WHERE id = ?1").get(threadId);
+  if (!thread) return c.json({ error: "thread_not_found" }, 404);
+  if (isThreadBusy(threadId)) return c.json({ error: "thread_busy" }, 409);
+  if (!hasLlmProviderConfigured(ctx)) return c.json({ error: "llm_not_configured" }, 400);
+
+  void runAgentTurn(ctx, threadId, PROMOTE_PROMPT, { tagCreatedTestsWithThreadId: true }).catch((err) => {
+    console.error(`promote turn failed for thread ${threadId}:`, err);
+  });
+  return c.json({ accepted: true }, 202);
+});
+
 // Stays open for the thread's whole lifetime (not just one turn) — a chat
 // keeps going across many messages, unlike a test run's SSE which closes
 // once that one run finishes.

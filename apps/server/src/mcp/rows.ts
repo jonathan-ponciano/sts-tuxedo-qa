@@ -13,6 +13,9 @@ export interface TestRow {
   created_at: string;
   updated_at: string;
   last_run_at?: string | null; // joined from test_runs, not a real column
+  schedule_enabled: number;
+  source_thread_id: number | null;
+  branch: string | null;
 }
 
 export interface TestRunRow {

@@ -93,7 +93,21 @@ export function hasLlmProviderConfigured(ctx: ProjectContext): boolean {
  * (see api/chat.ts's 202-then-stream pattern) — progress goes out over
  * `chat-hub.ts`'s SSE, not the return value.
  */
-export async function runAgentTurn(ctx: ProjectContext, threadId: number, userText: string): Promise<void> {
+export interface RunAgentTurnOptions {
+  // Set by the "salvar como teste fixo" flow (see api/chat.ts's /promote
+  // route) — any test this turn creates gets tagged with the thread it came
+  // from, purely for traceability (Tests.tsx can link back to the
+  // conversation that produced it). Off by default: a test created during a
+  // normal exploratory turn has no reason to claim this thread as its source.
+  tagCreatedTestsWithThreadId?: boolean;
+}
+
+export async function runAgentTurn(
+  ctx: ProjectContext,
+  threadId: number,
+  userText: string,
+  options: RunAgentTurnOptions = {},
+): Promise<void> {
   if (runningThreads.has(threadId)) throw new Error(`thread ${threadId} already has a turn in progress`);
   const provider = resolveProvider(ctx);
 
@@ -147,6 +161,11 @@ export async function runAgentTurn(ctx: ProjectContext, threadId: number, userTe
         if (block.name === "request_credential" && callResult.ok) {
           const output = callResult.output as { credentialId: number; status: string };
           if (output.status === "pending") waitingCredentialId = output.credentialId;
+        }
+
+        if (block.name === "create_test" && callResult.ok && options.tagCreatedTestsWithThreadId) {
+          const output = callResult.output as { testId: number };
+          ctx.db.run("UPDATE tests SET source_thread_id = ?1 WHERE id = ?2", [threadId, output.testId]);
         }
 
         toolResults.push({

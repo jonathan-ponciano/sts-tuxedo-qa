@@ -33,7 +33,7 @@ async function tick(): Promise<void> {
       const due = ctx.db
         .query(
           `SELECT id, schedule FROM tests
-           WHERE validated = 1 AND schedule IS NOT NULL
+           WHERE validated = 1 AND schedule IS NOT NULL AND schedule_enabled = 1
              AND (next_due_at IS NULL OR next_due_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
         )
         .all() as DueTestRow[];
