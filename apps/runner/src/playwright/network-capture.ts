@@ -1,4 +1,4 @@
-import type { Page, Response } from "playwright";
+import type { Page, Request, Response } from "playwright";
 import type { NetworkEntry } from "@tuxedo-qa/shared";
 
 const BODY_TRUNCATE_LENGTH = 5000;
@@ -17,6 +17,21 @@ function truncate(text: string): string {
 export function attachNetworkCapture(page: Page, onEntry: (entry: NetworkEntry) => void): void {
   page.on("response", (response) => {
     void handleResponse(response, onEntry);
+  });
+  // A request that never gets a response (DNS failure, connection refused,
+  // aborted, timed out) fires no "response" event at all — without this, a
+  // backend call that dies mid-flight is invisible to whoever's watching the
+  // network tab, which is exactly the failure mode worth surfacing here.
+  page.on("requestfailed", (request) => {
+    onEntry({
+      method: request.method(),
+      url: request.url(),
+      status: null,
+      resourceType: request.resourceType(),
+      timestamp: Date.now(),
+      requestBody: request.postData() ?? undefined,
+      failureText: request.failure()?.errorText ?? "unknown",
+    });
   });
 }
 

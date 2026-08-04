@@ -2,7 +2,8 @@ import { z } from "zod";
 import { ActionSchema, ElementInfoSchema, NetworkEntrySchema, PairDebugEventSchema, RunStatusSchema, RunTriggerSchema } from "./common.ts";
 
 /**
- * Every one of the 18 MCP tools from the PRD, as a name -> {input,output} schema pair.
+ * The 18 MCP tools from the PRD, plus `step_pair_debug` (added post-PRD — see
+ * its own comment below), as a name -> {input,output} schema pair.
  * `IMPLEMENTED_TOOLS` marks which ones have a real handler in this pass; the rest are
  * registered with full schemas but a `not_implemented` stub handler.
  */
@@ -70,6 +71,18 @@ export const toolSchemas = {
     description: "End a pair-debug session and return a draft Playwright test built from the human's actions.",
     input: z.object({ sessionId: z.number() }),
     output: z.object({ draftTestSource: z.string(), events: z.array(PairDebugEventSchema) }),
+  },
+  // Not in the original PRD's 18 — added so the AI can drive a pair-debug
+  // session itself instead of only watching a human drive it. Reuses the same
+  // session/browser as start_pair_debug (a human can still watch or take over
+  // via the same vncWsPath); each call applies one Action and returns a
+  // screenshot plus whatever console/network/nav/click events that action
+  // produced, so the AI can look, decide, and act again — the step-by-step
+  // loop a human tester actually does, instead of scripting a whole flow blind.
+  step_pair_debug: {
+    description: "Apply one action (click, fill, goto, etc.) to a live pair-debug session; returns a screenshot of the result plus the console/network/nav events that action triggered. Lets the AI drive and observe a real browser one step at a time instead of scripting a whole flow blind.",
+    input: z.object({ sessionId: z.number(), action: ActionSchema }),
+    output: z.object({ screenshotBase64: z.string(), events: z.array(PairDebugEventSchema) }),
   },
 
   // ---- test management ----
@@ -169,16 +182,16 @@ export const toolSchemas = {
   },
 } satisfies Record<string, { description: string; input: z.ZodTypeAny; output: z.ZodTypeAny }>;
 
-// Exactly the 18 tools from the PRD. The CI trigger path (`ci-run-test` /
-// repository_dispatch) is NOT an MCP tool — CI isn't an AI-assistant MCP
-// client. It calls the same internal `triggerRun` function directly via a
-// plain REST endpoint, deliberately bypassing the `validated` gate.
+// The 18 tools from the PRD, plus step_pair_debug. The CI trigger path
+// (`ci-run-test` / repository_dispatch) is NOT an MCP tool — CI isn't an
+// AI-assistant MCP client. It calls the same internal `triggerRun` function
+// directly via a plain REST endpoint, deliberately bypassing the `validated` gate.
 
 export type ToolName = keyof typeof toolSchemas;
 export type ToolInput<N extends ToolName> = z.infer<(typeof toolSchemas)[N]["input"]>;
 export type ToolOutput<N extends ToolName> = z.infer<(typeof toolSchemas)[N]["output"]>;
 
-/** All 18 tools now have a real handler — kept as an explicit list (rather than deriving it from the registry) so a future new tool defaults to "needs a decision", not silently "implemented". */
+/** All 19 tools now have a real handler — kept as an explicit list (rather than deriving it from the registry) so a future new tool defaults to "needs a decision", not silently "implemented". */
 export const IMPLEMENTED_TOOLS: ToolName[] = [
   "inspect_page",
   "create_test",
@@ -196,6 +209,7 @@ export const IMPLEMENTED_TOOLS: ToolName[] = [
   "delete_credential",
   "set_webhook",
   "start_pair_debug",
+  "step_pair_debug",
   "get_pair_debug_context",
   "stop_pair_debug",
 ];

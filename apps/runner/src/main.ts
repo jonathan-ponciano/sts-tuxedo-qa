@@ -3,9 +3,9 @@ import { chromium } from "playwright";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import type { InspectPageRequest, RunRequest } from "@tuxedo-qa/shared";
+import type { Action, InspectPageRequest, RunRequest } from "@tuxedo-qa/shared";
 import { config } from "./config.ts";
-import { startSession, stopSession, subscribeSession } from "./pair-debug/session.ts";
+import { startSession, stepSession, stopSession, subscribeSession } from "./pair-debug/session.ts";
 import { inspectPage } from "./playwright/inspect.ts";
 import { dryRunTest } from "./runs/dry-run.ts";
 import { executeRun } from "./runs/execute.ts";
@@ -137,6 +137,20 @@ app.get("/internal/pair-debug/sessions/:id/snapshot", (c) => {
     return c.json({ events: replay });
   } catch (err) {
     return c.json({ error: "pair_debug_session_not_found", message: (err as Error).message }, 404);
+  }
+});
+
+const pairDebugStepSchema = z.object({ action: actionSchema });
+
+app.post("/internal/pair-debug/sessions/:id/actions", async (c) => {
+  const sessionId = c.req.param("id");
+  const parsed = pairDebugStepSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
+  try {
+    const result = await stepSession(sessionId, parsed.data.action as Action);
+    return c.json(result);
+  } catch (err) {
+    return c.json({ error: "pair_debug_step_failed", message: (err as Error).message }, 404);
   }
 });
 
