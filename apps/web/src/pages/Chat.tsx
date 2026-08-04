@@ -37,19 +37,19 @@ function flattenMessages(messages: ChatMessageDTO[]): FlatItem[] {
 }
 
 function FlatItemView({ item }: { item: FlatItem }) {
-  if (item.kind === "user_text") return <p className="card">{item.text}</p>;
-  if (item.kind === "assistant_text") return <p>{item.text}</p>;
+  if (item.kind === "user_text") return <p className="msg-user">{item.text}</p>;
+  if (item.kind === "assistant_text") return <p className="msg-assistant">{item.text}</p>;
   if (item.kind === "tool_call") {
     return (
-      <pre className="log">
-        → {item.name}({JSON.stringify(item.input)})
-      </pre>
+      <p className="tool-block">
+        <span className="muted">→</span> {item.name}({JSON.stringify(item.input)})
+      </p>
     );
   }
   return (
-    <pre className="log" style={{ color: item.ok ? undefined : "var(--stop)" }}>
-      ← {item.name ?? "tool"}: {JSON.stringify(item.output)}
-    </pre>
+    <p className={`tool-block result${item.ok ? "" : " err"}`}>
+      <span className="muted">←</span> {item.name ?? "tool"}: {JSON.stringify(item.output)}
+    </p>
   );
 }
 
@@ -163,13 +163,7 @@ export function Chat() {
           <div
             key={t.id}
             onClick={() => setActiveThreadId(t.id)}
-            className="muted"
-            style={{
-              padding: "6px 8px",
-              cursor: "pointer",
-              color: t.id === activeThreadId ? "var(--ink)" : undefined,
-              borderLeft: t.id === activeThreadId ? "2px solid var(--ink)" : "2px solid transparent",
-            }}
+            className={`thread-list-item${t.id === activeThreadId ? " active" : ""}`}
           >
             {t.title}
           </div>

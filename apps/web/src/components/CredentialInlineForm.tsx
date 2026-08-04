@@ -42,8 +42,8 @@ export function CredentialInlineForm({ slug, credentialId, onFulfilled }: Creden
   }
 
   return (
-    <div className="card">
-      <p style={{ marginTop: 0 }}>
+    <div className="cred-card">
+      <p>
         O agente está esperando a credencial <strong>{credential?.name ?? `#${credentialId}`}</strong>
         {credential?.description ? ` — ${credential.description}` : ""}. O valor não passa pela conversa.
       </p>
