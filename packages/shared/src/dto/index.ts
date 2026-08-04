@@ -83,6 +83,37 @@ export interface PublicStatusPageDTO {
   tests: Array<{ name: string; status: RunStatus | null; lastRunAt: string | null }>;
 }
 
+export interface ChatThreadDTO {
+  id: number;
+  title: string;
+  status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Provider-agnostic content block — each LLM provider adapter (Anthropic,
+ * Gemini, ...) translates its own wire format to/from this shape at its own
+ * boundary, so `chat_messages` and the SPA never need to know which provider
+ * produced a given thread.
+ */
+export interface AgentContentBlock {
+  type: "text" | "tool_use" | "tool_result";
+  text?: string;
+  toolUseId?: string;
+  name?: string;
+  input?: unknown;
+  content?: string;
+  isError?: boolean;
+}
+
+export interface ChatMessageDTO {
+  id: number;
+  role: "user" | "assistant";
+  content: AgentContentBlock[];
+  createdAt: string;
+}
+
 export interface PairDebugSessionDTO {
   id: number;
   status: "starting" | "active" | "stopped";

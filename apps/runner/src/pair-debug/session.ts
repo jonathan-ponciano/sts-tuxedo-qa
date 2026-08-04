@@ -1,27 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { chromium, type Browser, type Page } from "playwright";
-import type { PairDebugEvent } from "@tuxedo-qa/shared";
+import { chromium, type Browser, type CDPSession, type Page } from "playwright";
+import type { Action, PairDebugEvent, PairDebugInputEvent } from "@tuxedo-qa/shared";
+import { applyAction } from "../playwright/actions.ts";
 import { attachNetworkCapture } from "../playwright/network-capture.ts";
 
 interface Session {
   id: string;
   browser: Browser;
+  page: Page;
+  cdp: CDPSession;
   events: PairDebugEvent[];
   seq: number;
   listeners: Set<(e: PairDebugEvent) => void>;
+  lastFrameBase64: string | null;
+  frameListeners: Set<(frameBase64: string) => void>;
 }
 
 const sessions = new Map<string, Session>();
-
-/**
- * v1 constraint: one active pair-debug session at a time, process-wide — the
- * headed browser runs on the single Xvfb display (:99) the container boots,
- * proxied through one noVNC endpoint. Multiple concurrent sessions would
- * need per-session displays/VNC ports, deferred until there's a real need.
- */
-export function hasActiveSession(): boolean {
-  return sessions.size > 0;
-}
 
 function record(session: Session, type: PairDebugEvent["type"], payload: Record<string, unknown>): void {
   session.seq += 1;
@@ -33,18 +28,37 @@ function record(session: Session, type: PairDebugEvent["type"], payload: Record<
 export async function startSession(
   url?: string,
   protectionHeaders?: Record<string, string>,
-): Promise<{ sessionId: string; vncWsPath: string }> {
-  if (hasActiveSession()) throw new Error("a pair-debug session is already active");
-
-  // headless: false relies on DISPLAY (set to :99 by entrypoint.sh) pointing at the container's Xvfb.
-  const browser = await chromium.launch({ headless: false, args: ["--start-maximized"] });
+): Promise<{ sessionId: string }> {
+  // headless:true works fine with CDP screencast — the renderer still paints
+  // frames, there's just no OS-level window to show them in. This is what
+  // let multiple sessions run per container at all: no more one shared Xvfb
+  // display (:99) serialized behind a single noVNC endpoint.
+  const browser = await chromium.launch({ headless: true });
   const page: Page = await browser.newPage();
   if (protectionHeaders && Object.keys(protectionHeaders).length > 0) {
     await page.setExtraHTTPHeaders(protectionHeaders);
   }
+  const cdp = await page.context().newCDPSession(page);
   const id = randomUUID();
-  const session: Session = { id, browser, events: [], seq: 0, listeners: new Set() };
+  const session: Session = {
+    id,
+    browser,
+    page,
+    cdp,
+    events: [],
+    seq: 0,
+    listeners: new Set(),
+    lastFrameBase64: null,
+    frameListeners: new Set(),
+  };
   sessions.set(id, session);
+
+  cdp.on("Page.screencastFrame", (frame) => {
+    session.lastFrameBase64 = frame.data;
+    for (const listener of session.frameListeners) listener(frame.data);
+    void cdp.send("Page.screencastFrameAck", { sessionId: frame.sessionId });
+  });
+  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, maxWidth: 1280, maxHeight: 800, everyNthFrame: 1 });
 
   page.on("console", (msg) => record(session, "console", { text: msg.text(), level: msg.type() }));
   // Fired at response time (not request time) so status + body are available —
@@ -71,9 +85,17 @@ export async function startSession(
     );
   });
 
-  if (url) await page.goto(url);
+  if (url) {
+    try {
+      await page.goto(url);
+    } catch (err) {
+      sessions.delete(id);
+      await browser.close();
+      throw err;
+    }
+  }
 
-  return { sessionId: id, vncWsPath: "/vnc" };
+  return { sessionId: id };
 }
 
 export function subscribeSession(sessionId: string, listener: (e: PairDebugEvent) => void) {
@@ -84,6 +106,107 @@ export function subscribeSession(sessionId: string, listener: (e: PairDebugEvent
     replay: [...session.events],
     unsubscribe: () => session.listeners.delete(listener),
   };
+}
+
+/**
+ * Screencast frames only arrive on repaint (navigation, animation, our own
+ * dispatched input) — a viewer that subscribes between repaints would stare
+ * at a blank canvas until the next one, so replay the last known frame
+ * immediately if there is one.
+ */
+export function subscribeScreencast(sessionId: string, listener: (frameBase64: string) => void) {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`pair-debug session ${sessionId} not found`);
+  session.frameListeners.add(listener);
+  if (session.lastFrameBase64) listener(session.lastFrameBase64);
+  return { unsubscribe: () => session.frameListeners.delete(listener) };
+}
+
+const CDP_MOUSE_BUTTON: Record<NonNullable<Extract<PairDebugInputEvent, { type: "mouseDown" }>["button"]>, "left" | "right" | "middle"> = {
+  left: "left",
+  right: "right",
+  middle: "middle",
+};
+
+/**
+ * Forwards one browser-side input event straight to CDP, bypassing
+ * Playwright's own `page.mouse`/`page.keyboard` (those serialize through
+ * Playwright's action queue and don't accept "just relay whatever the human
+ * is doing right now" semantics as cheaply as raw CDP calls do).
+ */
+export async function dispatchInput(sessionId: string, event: PairDebugInputEvent): Promise<void> {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`pair-debug session ${sessionId} not found`);
+  const { cdp } = session;
+
+  switch (event.type) {
+    case "mouseMove":
+      await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: event.x, y: event.y });
+      break;
+    case "mouseDown":
+      await cdp.send("Input.dispatchMouseEvent", {
+        type: "mousePressed",
+        x: event.x,
+        y: event.y,
+        button: CDP_MOUSE_BUTTON[event.button ?? "left"],
+        clickCount: 1,
+      });
+      break;
+    case "mouseUp":
+      await cdp.send("Input.dispatchMouseEvent", {
+        type: "mouseReleased",
+        x: event.x,
+        y: event.y,
+        button: CDP_MOUSE_BUTTON[event.button ?? "left"],
+        clickCount: 1,
+      });
+      break;
+    case "wheel":
+      await cdp.send("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x: event.x,
+        y: event.y,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+      });
+      break;
+    case "keyDown":
+      await cdp.send("Input.dispatchKeyEvent", {
+        type: event.text ? "keyDown" : "rawKeyDown",
+        key: event.key,
+        code: event.code,
+        text: event.text,
+      });
+      break;
+    case "keyUp":
+      await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: event.key, code: event.code });
+      break;
+  }
+}
+
+/**
+ * Lets the AI drive the same live page a human would over noVNC — one action
+ * at a time. `applyAction` runs on `session.page`, which already has the
+ * console/network/nav/click listeners from `startSession` wired up, so a
+ * `click` or `goto` action shows up in `session.events` exactly like a
+ * human-driven one; nothing extra to record here. Returns only the events
+ * that action produced (seq > beforeSeq) plus a screenshot of the result,
+ * so the caller sees what actually happened without re-fetching the whole
+ * timeline.
+ */
+export async function stepSession(sessionId: string, action: Action): Promise<{ screenshotBase64: string; events: PairDebugEvent[] }> {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error(`pair-debug session ${sessionId} not found`);
+
+  const beforeSeq = session.seq;
+  await applyAction(session.page, action);
+  // Same rationale as inspect_page: give the action's xhr/fetch calls a moment
+  // to resolve before reading the screenshot/events, or bodies show up empty.
+  await session.page.waitForTimeout(500);
+
+  const screenshotBase64 = (await session.page.screenshot({ fullPage: true })).toString("base64");
+  const events = session.events.filter((e) => e.seq > beforeSeq);
+  return { screenshotBase64, events };
 }
 
 function buildDraftTest(events: PairDebugEvent[]): string {

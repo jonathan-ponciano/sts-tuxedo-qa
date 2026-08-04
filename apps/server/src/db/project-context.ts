@@ -15,6 +15,11 @@ export interface ProjectContext {
   db: Database;
   specsDir: string;
   artifactsDir: string;
+  // Nullable: projects created before auth existed may still be unowned
+  // until adopted (see auth/signup.ts's adoptOrphanedProjects). Anything that
+  // needs the owning account (e.g. the chat agent resolving which LLM key to
+  // bill) must handle null explicitly rather than assume it's always set.
+  accountId: number | null;
 }
 
 export class ProjectNotFoundError extends Error {
@@ -34,6 +39,29 @@ export function resolveProject(slug: string): ProjectContext {
     db: getProjectDb(row.id, row.slug),
     specsDir: projectSpecsDir(row.slug),
     artifactsDir: projectArtifactsDir(row.slug),
+    accountId: row.account_id,
+  };
+}
+
+/**
+ * The auth-checked equivalent of `resolveProject`, for REST dashboard traffic
+ * only — `resolveProject` itself stays unscoped because the MCP route and the
+ * scheduler both need to reach any project regardless of which browser
+ * session is (or isn't) attached. Throwing the same `ProjectNotFoundError`
+ * for "doesn't exist" and "exists but isn't yours" is deliberate: a 404
+ * doesn't confirm another account's project slug exists.
+ */
+export function resolveProjectForAccount(slug: string, accountId: number): ProjectContext {
+  const row = findProjectBySlug(slug);
+  if (!row || row.account_id !== accountId) throw new ProjectNotFoundError(slug);
+  touchProjectSeen(row.id);
+  return {
+    id: row.id,
+    slug: row.slug,
+    db: getProjectDb(row.id, row.slug),
+    specsDir: projectSpecsDir(row.slug),
+    artifactsDir: projectArtifactsDir(row.slug),
+    accountId: row.account_id,
   };
 }
 
@@ -48,5 +76,6 @@ export function resolveProjectById(id: number): ProjectContext {
     db: getProjectDb(row.id, row.slug),
     specsDir: projectSpecsDir(row.slug),
     artifactsDir: projectArtifactsDir(row.slug),
+    accountId: row.account_id,
   };
 }

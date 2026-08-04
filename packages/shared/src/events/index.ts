@@ -17,3 +17,12 @@ export type PairDebugTimelineEvent = {
   type: "console" | "network" | "nav" | "click";
   payload: Record<string, unknown>;
 };
+
+export type AgentRunStatus = "running" | "waiting_input" | "completed" | "error";
+
+/** Unifies model text, tool progress, and run status into one SSE stream per chat thread. */
+export type ChatStreamEvent =
+  | { kind: "text_delta"; text: string; ts: number }
+  | { kind: "tool_call"; name: string; input: unknown; ts: number }
+  | { kind: "tool_result"; name: string; ok: boolean; output: unknown; ts: number }
+  | { kind: "run_status"; status: AgentRunStatus; errorMessage?: string; waitingOnCredentialId?: number; ts: number };

@@ -300,7 +300,7 @@ function readPairDebugSession(ctx: ProjectContext, sessionId: number): PairDebug
 
 export async function startPairDebug(ctx: ProjectContext, input: ToolInput<"start_pair_debug">): Promise<ToolOutput<"start_pair_debug">> {
   const protectionHeaders = getEnabledProtectionHeaders(ctx);
-  const { sessionId: runnerSessionId, vncWsPath } = await runnerClient.startPairDebug({
+  const { sessionId: runnerSessionId } = await runnerClient.startPairDebug({
     projectSlug: ctx.slug,
     url: input.url,
     protectionHeaders: Object.keys(protectionHeaders).length > 0 ? protectionHeaders : undefined,
@@ -309,7 +309,14 @@ export async function startPairDebug(ctx: ProjectContext, input: ToolInput<"star
     "INSERT INTO pair_debug_sessions (status, runner_session_id) VALUES ('active', ?1)",
     [runnerSessionId],
   );
-  return { sessionId: Number(lastInsertRowid), vncWsPath };
+  return { sessionId: Number(lastInsertRowid) };
+}
+
+/** Resolves the runner-side session id a REST caller needs for screencast/input, which aren't MCP tools (they're human-only, browser-driven concepts). */
+export function resolvePairDebugRunnerSessionId(ctx: ProjectContext, sessionId: number): string {
+  const row = readPairDebugSession(ctx, sessionId);
+  if (!row.runner_session_id) throw new Error(`pair-debug session ${sessionId} has no active runner session`);
+  return row.runner_session_id;
 }
 
 export async function getPairDebugContext(ctx: ProjectContext, input: ToolInput<"get_pair_debug_context">): Promise<ToolOutput<"get_pair_debug_context">> {
@@ -317,6 +324,12 @@ export async function getPairDebugContext(ctx: ProjectContext, input: ToolInput<
   if (!row.runner_session_id) return { events: [] };
   const { events } = await runnerClient.getPairDebugSnapshot(row.runner_session_id);
   return { events };
+}
+
+export async function stepPairDebug(ctx: ProjectContext, input: ToolInput<"step_pair_debug">): Promise<ToolOutput<"step_pair_debug">> {
+  const row = readPairDebugSession(ctx, input.sessionId);
+  if (!row.runner_session_id) throw new Error(`pair-debug session ${input.sessionId} has no active runner session`);
+  return runnerClient.stepPairDebug(row.runner_session_id, input.action);
 }
 
 export async function stopPairDebug(ctx: ProjectContext, input: ToolInput<"stop_pair_debug">): Promise<ToolOutput<"stop_pair_debug">> {

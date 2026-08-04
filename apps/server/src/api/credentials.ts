@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { credentialRowToMaskedDTO } from "./dto-mappers.ts";
+import { resumeAgentRunsWaitingOnCredential } from "../agent/credential-events.ts";
 import { encryptSecret } from "../crypto/index.ts";
 import type { CredentialRow } from "../mcp/rows.ts";
 
@@ -34,6 +35,8 @@ credentialsRouter.patch("/:id/fulfill", async (c) => {
     [blob, id],
   );
   if (changes === 0) return c.json({ error: "credential_not_found" }, 404);
+
+  resumeAgentRunsWaitingOnCredential(ctx, id);
 
   const row = ctx.db.query(`${SELECT_MASKED} WHERE id = ?1`).get(id) as CredentialRow;
   return c.json({ credential: credentialRowToMaskedDTO(row) });

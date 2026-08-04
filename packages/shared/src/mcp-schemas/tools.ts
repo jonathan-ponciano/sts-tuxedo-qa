@@ -58,9 +58,9 @@ export const toolSchemas = {
     }),
   },
   start_pair_debug: {
-    description: "Open a visible browser for a human to drive; records console/network/nav/click events.",
+    description: "Open a browser for a human to drive (live preview via the dashboard); records console/network/nav/click events.",
     input: z.object({ url: z.string().url().optional() }),
-    output: z.object({ sessionId: z.number(), vncWsPath: z.string() }),
+    output: z.object({ sessionId: z.number() }),
   },
   get_pair_debug_context: {
     description: "Return the recorded timeline of an in-progress pair-debug session.",
@@ -74,8 +74,8 @@ export const toolSchemas = {
   },
   // Not in the original PRD's 18 — added so the AI can drive a pair-debug
   // session itself instead of only watching a human drive it. Reuses the same
-  // session/browser as start_pair_debug (a human can still watch or take over
-  // via the same vncWsPath); each call applies one Action and returns a
+  // session/browser as start_pair_debug (a human can still watch live via the
+  // dashboard's preview panel); each call applies one Action and returns a
   // screenshot plus whatever console/network/nav/click events that action
   // produced, so the AI can look, decide, and act again — the step-by-step
   // loop a human tester actually does, instead of scripting a whole flow blind.

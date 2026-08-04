@@ -1,11 +1,14 @@
 import type {
+  Action,
   DryRunRequest,
   DryRunResponse,
   InspectPageRequest,
   InspectPageResponse,
   PairDebugEvent,
+  PairDebugInputEvent,
   PairDebugStartRequest,
   PairDebugStartResponse,
+  PairDebugStepResponse,
   PairDebugStopResponse,
   RunRequest,
   RunnerHealthResponse,
@@ -40,10 +43,34 @@ export const runnerClient = {
     if (!res.ok) throw new Error(`runner pair-debug snapshot failed: ${res.status}`);
     return (await res.json()) as { events: PairDebugEvent[] };
   },
+  stepPairDebug: async (sessionId: string, action: Action): Promise<PairDebugStepResponse> => {
+    const res = await fetch(`${config.runnerBaseUrl}/internal/pair-debug/sessions/${sessionId}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`runner pair-debug step failed: ${res.status} ${text}`);
+    }
+    return (await res.json()) as PairDebugStepResponse;
+  },
   health: async (): Promise<RunnerHealthResponse> => {
     const res = await fetch(`${config.runnerBaseUrl}/internal/health`);
     if (!res.ok) throw new Error(`runner health check failed: ${res.status}`);
     return (await res.json()) as RunnerHealthResponse;
   },
   runEventsUrl: (runId: number) => `${config.runnerBaseUrl}/internal/runs/${runId}/events`,
+  pairDebugScreencastUrl: (sessionId: string) => `${config.runnerBaseUrl}/internal/pair-debug/sessions/${sessionId}/screencast`,
+  dispatchPairDebugInput: async (sessionId: string, event: PairDebugInputEvent): Promise<void> => {
+    const res = await fetch(`${config.runnerBaseUrl}/internal/pair-debug/sessions/${sessionId}/input`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(event),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`runner pair-debug input failed: ${res.status} ${text}`);
+    }
+  },
 };

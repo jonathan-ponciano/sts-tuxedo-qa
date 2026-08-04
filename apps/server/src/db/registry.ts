@@ -27,6 +27,23 @@ export interface ProjectRow {
   disabled_at: string | null;
   last_seen_at: string | null;
   mcp_last_connected_at: string | null;
+  account_id: number | null;
+}
+
+export interface UserRow {
+  id: number;
+  email: string;
+  name: string;
+  password_hash: string | null;
+  github_id: string | null;
+  created_at: string;
+}
+
+export interface AccountRow {
+  id: number;
+  name: string;
+  slug: string;
+  created_at: string;
 }
 
 export interface ProjectStatsRow {
@@ -70,13 +87,19 @@ export function listProjects(): ProjectRow[] {
   return getRegistryDb().query("SELECT * FROM projects WHERE disabled_at IS NULL ORDER BY name").all() as ProjectRow[];
 }
 
+export function listProjectsForAccount(accountId: number): ProjectRow[] {
+  return getRegistryDb()
+    .query("SELECT * FROM projects WHERE disabled_at IS NULL AND account_id = ?1 ORDER BY name")
+    .all(accountId) as ProjectRow[];
+}
+
 export function getProjectStats(projectId: number): ProjectStatsRow | null {
   return getRegistryDb().query("SELECT * FROM project_stats WHERE project_id = ?1").get(projectId) as ProjectStatsRow | null;
 }
 
-export function createProject(slug: string, name: string, dbPath: string): ProjectRow {
+export function createProject(slug: string, name: string, dbPath: string, accountId: number): ProjectRow {
   const registryDb = getRegistryDb();
-  registryDb.run("INSERT INTO projects (slug, name, db_path) VALUES (?1, ?2, ?3)", [slug, name, dbPath]);
+  registryDb.run("INSERT INTO projects (slug, name, db_path, account_id) VALUES (?1, ?2, ?3, ?4)", [slug, name, dbPath, accountId]);
   const row = findProjectBySlug(slug);
   if (!row) throw new Error("failed to create project");
   registryDb.run("INSERT INTO project_stats (project_id) VALUES (?1)", [row.id]);
@@ -119,4 +142,132 @@ export function updateProjectStats(
        updated_at = excluded.updated_at`,
     [projectId, stats.testCount, stats.passingCount, stats.failingCount, stats.lastRunAt],
   );
+}
+
+// ---- auth: users, accounts, sessions ----
+
+export function findUserByEmail(email: string): UserRow | null {
+  return getRegistryDb().query("SELECT * FROM users WHERE email = ?1").get(email) as UserRow | null;
+}
+
+export function findUserById(id: number): UserRow | null {
+  return getRegistryDb().query("SELECT * FROM users WHERE id = ?1").get(id) as UserRow | null;
+}
+
+export function createUser(email: string, name: string, passwordHash: string): UserRow {
+  const registryDb = getRegistryDb();
+  registryDb.run("INSERT INTO users (email, name, password_hash) VALUES (?1, ?2, ?3)", [email, name, passwordHash]);
+  const row = findUserByEmail(email);
+  if (!row) throw new Error("failed to create user");
+  return row;
+}
+
+export function countAccounts(): number {
+  const row = getRegistryDb().query("SELECT COUNT(*) as n FROM accounts").get() as { n: number };
+  return row.n;
+}
+
+export function createAccount(name: string, slug: string): AccountRow {
+  const registryDb = getRegistryDb();
+  registryDb.run("INSERT INTO accounts (name, slug) VALUES (?1, ?2)", [name, slug]);
+  const row = registryDb.query("SELECT * FROM accounts WHERE slug = ?1").get(slug) as AccountRow | null;
+  if (!row) throw new Error("failed to create account");
+  return row;
+}
+
+export function addAccountMember(accountId: number, userId: number, role: "owner" | "member" = "owner"): void {
+  getRegistryDb().run("INSERT INTO account_members (account_id, user_id, role) VALUES (?1, ?2, ?3)", [accountId, userId, role]);
+}
+
+/** A user's accounts, ordered by membership creation (oldest/primary first). */
+export function findAccountsForUser(userId: number): AccountRow[] {
+  return getRegistryDb()
+    .query(
+      `SELECT a.* FROM accounts a
+       JOIN account_members m ON m.account_id = a.id
+       WHERE m.user_id = ?1
+       ORDER BY m.created_at ASC`,
+    )
+    .all(userId) as AccountRow[];
+}
+
+export function findAccountById(id: number): AccountRow | null {
+  return getRegistryDb().query("SELECT * FROM accounts WHERE id = ?1").get(id) as AccountRow | null;
+}
+
+/**
+ * Local installs from before auth existed have projects with no owner.
+ * The very first account ever created (i.e. the first person to sign up on
+ * this instance) adopts them, so upgrading in place doesn't strand existing
+ * work behind an account nothing owns.
+ */
+export function adoptOrphanedProjects(accountId: number): void {
+  getRegistryDb().run("UPDATE projects SET account_id = ?1 WHERE account_id IS NULL", [accountId]);
+}
+
+export interface SessionRow {
+  token: string;
+  user_id: number;
+  created_at: string;
+  expires_at: string;
+}
+
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function createSession(userId: number): SessionRow {
+  const token = crypto.randomUUID() + crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+  getRegistryDb().run("INSERT INTO sessions (token, user_id, expires_at) VALUES (?1, ?2, ?3)", [token, userId, expiresAt]);
+  return { token, user_id: userId, created_at: new Date().toISOString(), expires_at: expiresAt };
+}
+
+export function findValidSession(token: string): SessionRow | null {
+  const row = getRegistryDb().query("SELECT * FROM sessions WHERE token = ?1").get(token) as SessionRow | null;
+  if (!row) return null;
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    deleteSession(token);
+    return null;
+  }
+  return row;
+}
+
+export function deleteSession(token: string): void {
+  getRegistryDb().run("DELETE FROM sessions WHERE token = ?1", [token]);
+}
+
+// ---- LLM provider credentials (account-level, for the embedded chat agent) ----
+
+export type LlmProvider = "anthropic" | "gemini";
+
+export interface LlmCredentialRow {
+  account_id: number;
+  provider: LlmProvider;
+  secret_blob: Uint8Array;
+  created_at: string;
+  updated_at: string;
+}
+
+export function upsertLlmCredential(accountId: number, provider: LlmProvider, secretBlob: Buffer): void {
+  getRegistryDb().run(
+    `INSERT INTO llm_credentials (account_id, provider, secret_blob) VALUES (?1, ?2, ?3)
+     ON CONFLICT(account_id, provider) DO UPDATE SET secret_blob = excluded.secret_blob, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+    [accountId, provider, secretBlob],
+  );
+}
+
+export function findLlmCredential(accountId: number, provider: LlmProvider): LlmCredentialRow | null {
+  return getRegistryDb()
+    .query("SELECT * FROM llm_credentials WHERE account_id = ?1 AND provider = ?2")
+    .get(accountId, provider) as LlmCredentialRow | null;
+}
+
+export function listLlmCredentialProviders(accountId: number): LlmProvider[] {
+  const rows = getRegistryDb().query("SELECT provider FROM llm_credentials WHERE account_id = ?1").all(accountId) as {
+    provider: LlmProvider;
+  }[];
+  return rows.map((r) => r.provider);
+}
+
+export function deleteLlmCredential(accountId: number, provider: LlmProvider): void {
+  getRegistryDb().run("DELETE FROM llm_credentials WHERE account_id = ?1 AND provider = ?2", [accountId, provider]);
 }

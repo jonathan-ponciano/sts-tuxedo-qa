@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import type { PairDebugEvent } from "@tuxedo-qa/shared";
+import { LivePreviewPanel } from "../components/LivePreviewPanel.tsx";
 import { api } from "../lib/api.ts";
 
 export function PairDebug() {
   const { slug } = useParams<{ slug: string }>();
-  const [session, setSession] = useState<{ id: number; vncWsPath: string } | null>(null);
+  const [session, setSession] = useState<{ id: number } | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const [events, setEvents] = useState<PairDebugEvent[]>([]);
   const [busy, setBusy] = useState(false);
@@ -15,19 +16,13 @@ export function PairDebug() {
   if (!slug) return null;
   const projectSlug = slug;
 
-  const vncViewerUrl = session
-    ? `/api/projects/${slug}/pair-debug/vnc/vnc.html?autoconnect=true&resize=scale&path=${encodeURIComponent(
-        `api/projects/${slug}/pair-debug/vnc/websockify`,
-      )}`
-    : null;
-
   async function handleStart() {
     setBusy(true);
     setError(null);
     setDraft(null);
     try {
       const result = await api.startPairDebug(projectSlug, url || undefined);
-      setSession({ id: result.sessionId, vncWsPath: result.vncWsPath });
+      setSession({ id: result.sessionId });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -55,8 +50,8 @@ export function PairDebug() {
     <div>
       <h2>Pair Debug</h2>
       <p className="muted">
-        Abre um browser de verdade (headed) dentro do container do runner. Você dirige, o tuxedo-qa grava
-        navegação/cliques e monta um rascunho de teste Playwright quando você para a sessão.
+        Abre um browser de verdade dentro do container do runner. Você dirige direto pelo preview abaixo, o
+        tuxedo-qa grava navegação/cliques e monta um rascunho de teste Playwright quando você para a sessão.
       </p>
 
       {!session ? (
@@ -73,18 +68,11 @@ export function PairDebug() {
               Iniciar sessão
             </button>
           </div>
-          <p className="muted" style={{ margin: 0 }}>
-            Só uma sessão ativa por vez (um único display no runner).
-          </p>
         </div>
       ) : (
         <div className="card">
-          <p>
-            Sessão #{session.id} ativa —{" "}
-            <a href={vncViewerUrl!} target="_blank" rel="noopener noreferrer">
-              abrir viewer noVNC (nova aba)
-            </a>
-          </p>
+          <p>Sessão #{session.id} ativa</p>
+          <LivePreviewPanel slug={projectSlug} sessionId={session.id} />
           <button onClick={() => void handleStop()} disabled={busy}>
             Parar e gerar rascunho de teste
           </button>

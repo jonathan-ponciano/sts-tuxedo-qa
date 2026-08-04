@@ -46,3 +46,29 @@ export interface PairDebugSessionRow {
   runner_session_id: string | null;
   draft_test_path: string | null;
 }
+
+export interface ChatThreadRow {
+  id: number;
+  title: string;
+  status: "active" | "archived";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessageRow {
+  id: number;
+  thread_id: number;
+  role: "user" | "assistant";
+  content: string; // JSON — Anthropic content-block array, verbatim
+  created_at: string;
+}
+
+export interface AgentRunRow {
+  id: number;
+  thread_id: number;
+  status: "running" | "waiting_input" | "completed" | "error";
+  waiting_on_credential_id: number | null;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
+}

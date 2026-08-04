@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { ProjectDTO } from "@tuxedo-qa/shared";
 import { projectDbPath } from "../config.ts";
-import { createProject, getProjectStats, listProjects } from "../db/registry.ts";
+import { createProject, getProjectStats, listProjectsForAccount } from "../db/registry.ts";
 import { getActiveRunCount } from "../streaming/hub.ts";
+import { authMiddleware } from "./middleware.ts";
 
 export const projectsRouter = new Hono();
+projectsRouter.use("*", authMiddleware);
 
 const createProjectSchema = z.object({
   slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, "lowercase letters, digits, hyphens"),
@@ -13,7 +15,7 @@ const createProjectSchema = z.object({
 });
 
 projectsRouter.get("/", (c) => {
-  const projects: ProjectDTO[] = listProjects().map((row) => {
+  const projects: ProjectDTO[] = listProjectsForAccount(c.get("account").id).map((row) => {
     const stats = getProjectStats(row.id);
     return {
       id: row.id,
@@ -34,7 +36,7 @@ projectsRouter.post("/", async (c) => {
   if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
 
   try {
-    const row = createProject(parsed.data.slug, parsed.data.name, projectDbPath(parsed.data.slug));
+    const row = createProject(parsed.data.slug, parsed.data.name, projectDbPath(parsed.data.slug), c.get("account").id);
     return c.json({ project: row }, 201);
   } catch (err) {
     if ((err as Error).message.includes("UNIQUE constraint")) {

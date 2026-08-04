@@ -13,6 +13,15 @@ export const config = {
   runnerBaseUrl: env("RUNNER_BASE_URL", "http://localhost:4000"),
   publicBaseUrl: env("PUBLIC_BASE_URL", `http://localhost:${env("PORT", "3000")}`),
   schedulerIntervalMs: Number(env("SCHEDULER_INTERVAL_MS", "60000")),
+  // Optional (not `env()`) on purpose: the rest of the app — MCP, REST,
+  // dashboard — has nothing to do with this key and must keep working
+  // without it. Only the embedded chat agent needs it, and it fails that one
+  // request clearly (see agent-loop.ts) rather than crashing the whole server.
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  // Configurable rather than hardcoded: model slugs move faster than this
+  // codebase does, and a stale hardcoded id just 404s every chat turn.
+  chatModel: env("CHAT_MODEL", "claude-sonnet-4-5-20250929"),
+  geminiChatModel: env("GEMINI_CHAT_MODEL", "gemini-2.0-flash"),
 };
 
 /** Multi-stage Dockerfile copies the built SPA to apps/web/dist alongside this app; absent in dev (Vite serves it directly). */

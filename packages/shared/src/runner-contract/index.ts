@@ -55,12 +55,33 @@ export interface PairDebugStartRequest {
 }
 export interface PairDebugStartResponse {
   sessionId: string;
-  vncWsPath: string;
 }
 export interface PairDebugStopResponse {
   draftTestSource: string;
   events: PairDebugEvent[];
 }
+export interface PairDebugStepRequest {
+  action: Action;
+}
+export interface PairDebugStepResponse {
+  screenshotBase64: string;
+  events: PairDebugEvent[];
+}
+
+/**
+ * Raw browser input forwarded from a human watching the live preview —
+ * mirrors native mouse/keyboard event shapes closely enough that the SPA can
+ * build these straight from onMouseMove/onKeyDown handlers. Never AI-facing
+ * (the AI drives via `Action`/`step_pair_debug`, not this), so it lives here
+ * rather than in mcp-schemas.
+ */
+export type PairDebugInputEvent =
+  | { type: "mouseMove"; x: number; y: number }
+  | { type: "mouseDown"; x: number; y: number; button?: "left" | "right" | "middle" }
+  | { type: "mouseUp"; x: number; y: number; button?: "left" | "right" | "middle" }
+  | { type: "wheel"; x: number; y: number; deltaX: number; deltaY: number }
+  | { type: "keyDown"; key: string; code: string; text?: string }
+  | { type: "keyUp"; key: string; code: string };
 
 export interface RunnerHealthResponse {
   ok: true;
