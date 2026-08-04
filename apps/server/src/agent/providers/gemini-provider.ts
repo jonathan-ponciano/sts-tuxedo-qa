@@ -9,10 +9,9 @@ import type { AgentProvider, ProviderMessage, ProviderToolDef } from "./types.ts
  * array `streamGenerateContent` returns by default, which is what the
  * official SDKs do internally anyway.
  *
- * NOT exercised against a real API key yet (see Settings.tsx's note) — the
- * shapes below follow Google's documented request/response format, but this
- * path needs a real run to be sure of it, the same way the Anthropic path
- * was verified by hand before being trusted.
+ * Verified against a real API key — the request/response shapes matched
+ * Google's docs on the first real call; the one real surprise was the
+ * `parameters` schema restriction handled by sanitizeSchemaForGemini below.
  */
 
 type GeminiRole = "user" | "model" | "function";
@@ -39,6 +38,42 @@ function toGeminiPart(block: AgentContentBlock): Record<string, unknown> {
 
 function toGeminiContents(messages: ProviderMessage[]): Array<{ role: GeminiRole; parts: Record<string, unknown>[] }> {
   return messages.map((m) => ({ role: toGeminiRole(m), parts: m.content.map(toGeminiPart) }));
+}
+
+/**
+ * Gemini's function-declaration `parameters` field accepts a restricted
+ * OpenAPI 3.0 subset, not full JSON Schema — confirmed against the real API,
+ * which 400s on keywords `zod-to-json-schema` emits for our tool schemas
+ * (nullable fields, e.g. `z.string().nullable()`, are the common source):
+ *   - `additionalProperties` — unsupported, dropped (Gemini doesn't need it).
+ *   - `const` — unsupported, rewritten as a single-value `enum` (semantically
+ *     equivalent for a literal).
+ *   - `type` as a JSON-Schema-style array (e.g. `["string","null"]`, how
+ *     nullable fields render) — Gemini's `type` is a single non-repeated
+ *     proto field, not a list. Collapsed to the first non-null entry, with
+ *     `nullable: true` set if "null" was one of the options.
+ */
+function sanitizeSchemaForGemini(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(sanitizeSchemaForGemini);
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (key === "additionalProperties") continue;
+      if (key === "const") {
+        out.enum = [value];
+        continue;
+      }
+      if (key === "type" && Array.isArray(value)) {
+        const types = value as unknown[];
+        out.type = types.find((t) => t !== "null") ?? "string";
+        if (types.includes("null")) out.nullable = true;
+        continue;
+      }
+      out[key] = sanitizeSchemaForGemini(value);
+    }
+    return out;
+  }
+  return node;
 }
 
 interface GeminiStreamChunk {
@@ -76,7 +111,7 @@ export function createGeminiProvider(apiKey: string): AgentProvider {
       const functionDeclarations = tools.map((t: ProviderToolDef) => ({
         name: t.name,
         description: t.description,
-        parameters: t.inputSchema,
+        parameters: sanitizeSchemaForGemini(t.inputSchema),
       }));
 
       const res = await fetch(url, {
